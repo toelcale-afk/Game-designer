@@ -76,6 +76,18 @@ object ApkInspector {
         inspectCopiedFile(context, apk, name)
     }
 
+    /** Copies an APK that PackFlow built (GitHub or quick build) into cache/incoming and inspects it. */
+    suspend fun inspectFile(context: Context, file: File): ApkInfo = withContext(Dispatchers.IO) {
+        ErrorLog.info("Opening built APK ${file.name}")
+        val dir = File(context.cacheDir, "incoming").apply {
+            mkdirs()
+            listFiles()?.forEach { it.delete() }
+        }
+        val apk = File(dir, "candidate.apk")
+        file.copyTo(apk, overwrite = true)
+        inspectCopiedFile(context, apk, file.name)
+    }
+
     /** Copies the app's own base APK into cache/incoming/candidate.apk for instant testing of the preview and install flow. */
     suspend fun inspectSampleApk(context: Context): ApkInfo = withContext(Dispatchers.IO) {
         val name = "sample-packflow-test.apk"

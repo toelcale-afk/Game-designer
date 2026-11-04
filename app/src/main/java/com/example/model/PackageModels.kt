@@ -129,10 +129,21 @@ data class RuntimeApkTelemetry(
     val isDebuggable: Boolean
 )
 
-enum class PackFlowTab {
-    INSTALL_APK,
-    CLAUDE_STUDIO,
-    BUNDLER,
-    INSPECTOR,
-    ERROR_LOG
+/**
+ * PackFlow pipeline: the numbered main flow (1-4) followed by the extras.
+ */
+enum class PackFlowTab(val label: String, val step: Int?) {
+    PREVIEW("Preview", 1),
+    ICON("Icon", 2),
+    COMPILE("Compile & Check", 3),
+    INSTALL("Install", 4),
+    BUNDLER("Bundler", null),
+    INSPECTOR("Inspector", null),
+    ERROR_LOG("Error Log", null);
+
+    val title: String get() = step?.let { "$it $label" } ?: label
+
+    /** The next step of the main flow, or null for the last step and the extras. */
+    val next: PackFlowTab?
+        get() = step?.let { s -> entries.firstOrNull { it.step == s + 1 } }
 }

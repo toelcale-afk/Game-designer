@@ -11,42 +11,32 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.InstallMobile
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.outlined.BugReport
-import androidx.compose.material.icons.outlined.Code
-import androidx.compose.material.icons.outlined.FolderZip
-import androidx.compose.material.icons.outlined.InstallMobile
-import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -58,10 +48,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,11 +64,14 @@ import com.example.data.PackagerEngine
 import com.example.model.BuiltArchive
 import com.example.model.PackFlowTab
 import com.example.ui.BundlerScreen
-import com.example.ui.ClaudeStudioScreen
+import com.example.ui.CompileCheckScreen
 import com.example.ui.ErrorLogScreen
 import com.example.ui.FileEditorDialog
+import com.example.ui.IconStepScreen
 import com.example.ui.InspectorScreen
 import com.example.ui.PackFlowViewModel
+import com.example.ui.PreviewScreen
+import com.example.ui.QuickBuildCard
 import com.example.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -94,38 +87,39 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private data class NavTabInfo(
-    val tab: PackFlowTab,
-    val labelRes: Int,
-    val selectedIcon: ImageVector,
-    val unselectedIcon: ImageVector,
-    val testTag: String
-)
-
+/**
+ * PackFlow: the build pipeline. Main flow 1 Preview -> 2 Icon -> 3 Compile & Check -> 4 Install,
+ * then the extras (Bundler, Inspector, Error Log).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PackFlowApp(
-    viewModel: PackFlowViewModel = viewModel()
+    viewModel: PackFlowViewModel = viewModel(),
+    onExit: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val gitHubState by viewModel.gitHub.state.collectAsStateWithLifecycle()
     var pendingExportArchive by remember { mutableStateOf<BuiltArchive?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.refreshRuntimeTelemetry(context)
+        viewModel.gitHub.load(context)
     }
 
     BackHandler(
         enabled = uiState.showNewFileDialog ||
             uiState.editingEntry != null ||
             uiState.isLivePreviewFullScreen ||
-            uiState.activeTab != PackFlowTab.INSTALL_APK
+            uiState.activeTab != PackFlowTab.PREVIEW ||
+            onExit != null
     ) {
         when {
             uiState.showNewFileDialog -> viewModel.dismissNewFileDialog()
             uiState.editingEntry != null -> viewModel.dismissEditEntry()
             uiState.isLivePreviewFullScreen -> viewModel.toggleLivePreviewFullScreen(false)
-            uiState.activeTab != PackFlowTab.INSTALL_APK -> viewModel.selectTab(PackFlowTab.INSTALL_APK)
+            uiState.activeTab != PackFlowTab.PREVIEW -> viewModel.selectTab(PackFlowTab.PREVIEW)
+            else -> onExit?.invoke()
         }
     }
 
@@ -167,52 +161,26 @@ fun PackFlowApp(
         pendingExportArchive = null
     }
 
-    val navTabs = listOf(
-        NavTabInfo(
-            tab = PackFlowTab.INSTALL_APK,
-            labelRes = R.string.nav_install_apk,
-            selectedIcon = Icons.Filled.InstallMobile,
-            unselectedIcon = Icons.Outlined.InstallMobile,
-            testTag = "nav_tab_install_apk"
-        ),
-        NavTabInfo(
-            tab = PackFlowTab.CLAUDE_STUDIO,
-            labelRes = R.string.nav_claude_studio,
-            selectedIcon = Icons.Filled.Code,
-            unselectedIcon = Icons.Outlined.Code,
-            testTag = "nav_tab_claude_studio"
-        ),
-        NavTabInfo(
-            tab = PackFlowTab.BUNDLER,
-            labelRes = R.string.nav_bundler,
-            selectedIcon = Icons.Filled.FolderZip,
-            unselectedIcon = Icons.Outlined.FolderZip,
-            testTag = "nav_tab_bundler"
-        ),
-        NavTabInfo(
-            tab = PackFlowTab.INSPECTOR,
-            labelRes = R.string.nav_inspector,
-            selectedIcon = Icons.Filled.Memory,
-            unselectedIcon = Icons.Outlined.Memory,
-            testTag = "nav_tab_inspector"
-        ),
-        NavTabInfo(
-            tab = PackFlowTab.ERROR_LOG,
-            labelRes = R.string.nav_error_log,
-            selectedIcon = Icons.Filled.BugReport,
-            unselectedIcon = Icons.Outlined.BugReport,
-            testTag = "nav_tab_error_log"
-        )
-    )
+    val goTo: (PackFlowTab) -> Unit = { tab ->
+        if (tab == PackFlowTab.INSTALL && uiState.activeTab == PackFlowTab.INSTALL) {
+            InstallerSession.screen = InstallerScreen.Pick
+        }
+        viewModel.selectTab(tab)
+    }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val isExpandedScreen = maxWidth >= 600.dp
-
-        Scaffold(
-            contentWindowInsets = WindowInsets.safeDrawing,
-            topBar = {
-                if (!uiState.isLivePreviewFullScreen && uiState.activeTab != PackFlowTab.INSTALL_APK) {
+    Scaffold(
+        contentWindowInsets = WindowInsets.safeDrawing,
+        topBar = {
+            if (!uiState.isLivePreviewFullScreen) {
+                Column {
                     TopAppBar(
+                        navigationIcon = {
+                            if (onExit != null) {
+                                IconButton(onClick = onExit) {
+                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Home")
+                                }
+                            }
+                        },
                         title = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
@@ -232,156 +200,114 @@ fun PackFlowApp(
                             titleContentColor = MaterialTheme.colorScheme.onBackground
                         )
                     )
-                }
-            },
-            bottomBar = {
-                if (!isExpandedScreen && !uiState.isLivePreviewFullScreen) {
-                    NavigationBar(modifier = Modifier.testTag("bottom_navigation_bar")) {
-                        navTabs.forEach { item ->
-                            val selected = uiState.activeTab == item.tab
-                            NavigationBarItem(
-                                selected = selected,
-                                onClick = {
-                                    if (item.tab == PackFlowTab.INSTALL_APK && uiState.activeTab == PackFlowTab.INSTALL_APK) {
-                                        InstallerSession.screen = InstallerScreen.Pick
-                                    }
-                                    viewModel.selectTab(item.tab)
-                                },
-                                icon = {
-                                    if (item.tab == PackFlowTab.ERROR_LOG && uiState.totalErrorCount > 0) {
-                                        BadgedBox(
-                                            badge = {
-                                                Badge { Text(uiState.totalErrorCount.toString()) }
-                                            }
-                                        ) {
-                                            Icon(
-                                                imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                                contentDescription = stringResource(item.labelRes)
-                                            )
-                                        }
-                                    } else {
-                                        Icon(
-                                            imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                            contentDescription = stringResource(item.labelRes)
-                                        )
-                                    }
-                                },
-                                label = { Text(stringResource(item.labelRes)) },
-                                modifier = Modifier.testTag(item.testTag)
-                            )
-                        }
-                    }
+                    PipelineTabRow(
+                        active = uiState.activeTab,
+                        errorCount = uiState.totalErrorCount,
+                        onSelect = goTo
+                    )
                 }
             }
-        ) { innerPadding ->
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-            ) {
-                if (isExpandedScreen && !uiState.isLivePreviewFullScreen) {
-                    NavigationRail(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .testTag("side_navigation_rail")
-                    ) {
-                        navTabs.forEach { item ->
-                            val selected = uiState.activeTab == item.tab
-                            NavigationRailItem(
-                                selected = selected,
-                                onClick = {
-                                    if (item.tab == PackFlowTab.INSTALL_APK && uiState.activeTab == PackFlowTab.INSTALL_APK) {
-                                        InstallerSession.screen = InstallerScreen.Pick
-                                    }
-                                    viewModel.selectTab(item.tab)
-                                },
-                                icon = {
-                                    Icon(
-                                        imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                                        contentDescription = stringResource(item.labelRes)
-                                    )
-                                },
-                                label = { Text(stringResource(item.labelRes)) },
-                                modifier = Modifier.testTag(item.testTag)
-                            )
-                        }
-                    }
+        }
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            AnimatedVisibility(visible = uiState.statusBannerMessage != null && !uiState.isLivePreviewFullScreen && uiState.activeTab != PackFlowTab.INSTALL) {
+                uiState.statusBannerMessage?.let { msg ->
+                    StatusFeedbackBanner(
+                        message = msg,
+                        onDismiss = { viewModel.dismissBanner() }
+                    )
                 }
+            }
 
-                Column(modifier = Modifier.weight(1f)) {
-                    AnimatedVisibility(visible = uiState.statusBannerMessage != null && !uiState.isLivePreviewFullScreen && uiState.activeTab != PackFlowTab.INSTALL_APK) {
-                        uiState.statusBannerMessage?.let { msg ->
-                            StatusFeedbackBanner(
-                                message = msg,
-                                onDismiss = { viewModel.dismissBanner() }
-                            )
+            Box(modifier = Modifier.weight(1f)) {
+                when (uiState.activeTab) {
+                    PackFlowTab.PREVIEW -> PreviewScreen(
+                        rawInput = uiState.claudeRawInput,
+                        config = uiState.claudeConfig,
+                        extractedFiles = uiState.claudeExtractedFiles,
+                        diagnostics = uiState.claudeDiagnostics,
+                        consoleLogs = uiState.claudeConsoleLogs,
+                        isFullScreenPreview = uiState.isLivePreviewFullScreen,
+                        onRawInputChange = viewModel::updateClaudeRawInput,
+                        onSelectPreset = viewModel::selectClaudePreset,
+                        onUpdateConfig = viewModel::updateClaudeConfig,
+                        onImportClaudeFile = { claudeFilePickerLauncher.launch("*/*") },
+                        onNext = { goTo(PackFlowTab.ICON) },
+                        onAppendConsoleLog = viewModel::appendWebViewConsoleMessage,
+                        onClearConsole = viewModel::clearConsoleLogs,
+                        onToggleFullScreenPreview = viewModel::toggleLivePreviewFullScreen
+                    )
+
+                    PackFlowTab.ICON -> IconStepScreen(
+                        viewModel = viewModel,
+                        onNext = { goTo(PackFlowTab.COMPILE) }
+                    )
+
+                    PackFlowTab.COMPILE -> CompileCheckScreen(
+                        config = uiState.claudeConfig,
+                        files = uiState.claudeExtractedFiles,
+                        diagnostics = uiState.claudeDiagnostics,
+                        runtimeErrors = uiState.claudeRuntimeErrors,
+                        gitHub = gitHubState,
+                        quickBuild = { QuickBuildCard(viewModel = viewModel, onSendToInstall = { goTo(PackFlowTab.INSTALL) }) },
+                        onPackageZip = { viewModel.packageClaudeFilesIntoApkZip(context) },
+                        onSaveGitHub = { target, token -> viewModel.gitHub.save(context, target, token) },
+                        onClearToken = { viewModel.gitHub.clearToken(context) },
+                        onPushAndBuild = { viewModel.pushAndBuildOnGitHub(context) },
+                        onCancelBuild = { viewModel.gitHub.cancel() },
+                        onSendToInstall = {
+                            gitHubState.apkFile?.let { apk ->
+                                InstallerSession.openFile(context, apk)
+                                viewModel.selectTab(PackFlowTab.INSTALL)
+                            }
                         }
-                    }
+                    )
 
-                    Box(modifier = Modifier.weight(1f)) {
-                        when (uiState.activeTab) {
-                            PackFlowTab.INSTALL_APK -> PackFlowInstaller()
+                    PackFlowTab.INSTALL -> PackFlowInstaller()
 
-                            PackFlowTab.CLAUDE_STUDIO -> ClaudeStudioScreen(
-                                rawInput = uiState.claudeRawInput,
-                                config = uiState.claudeConfig,
-                                extractedFiles = uiState.claudeExtractedFiles,
-                                diagnostics = uiState.claudeDiagnostics,
-                                runtimeErrors = uiState.claudeRuntimeErrors,
-                                consoleLogs = uiState.claudeConsoleLogs,
-                                isFullScreenPreview = uiState.isLivePreviewFullScreen,
-                                onRawInputChange = viewModel::updateClaudeRawInput,
-                                onSelectPreset = viewModel::selectClaudePreset,
-                                onUpdateConfig = viewModel::updateClaudeConfig,
-                                onImportClaudeFile = { claudeFilePickerLauncher.launch("*/*") },
-                                onPackageToApkZip = { viewModel.packageClaudeFilesIntoApkZip(context) },
-                                onAppendConsoleLog = viewModel::appendWebViewConsoleMessage,
-                                onClearConsole = viewModel::clearConsoleLogs,
-                                onToggleFullScreenPreview = viewModel::toggleLivePreviewFullScreen,
-                                onCopyPromptSuccess = { }
+                    PackFlowTab.BUNDLER -> BundlerScreen(
+                        uiState = uiState,
+                        onBundleNameChange = viewModel::updateBundleName,
+                        onSelectCompression = viewModel::selectCompressionProfile,
+                        onSelectCategory = viewModel::selectCategoryFilter,
+                        onOpenNewFileDialog = viewModel::openNewFileDialog,
+                        onPickDeviceFile = { filePickerLauncher.launch("*/*") },
+                        onPickPhotoMedia = {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             )
-
-                            PackFlowTab.BUNDLER -> BundlerScreen(
-                                uiState = uiState,
-                                onBundleNameChange = viewModel::updateBundleName,
-                                onSelectCompression = viewModel::selectCompressionProfile,
-                                onSelectCategory = viewModel::selectCategoryFilter,
-                                onOpenNewFileDialog = viewModel::openNewFileDialog,
-                                onPickDeviceFile = { filePickerLauncher.launch("*/*") },
-                                onPickPhotoMedia = {
-                                    photoPickerLauncher.launch(
-                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                    )
-                                },
-                                onEditEntry = viewModel::openEditEntry,
-                                onRemoveEntry = viewModel::removeStagedEntry,
-                                onBuildZipPackage = { viewModel.packageCurrentStagingToZip(context) },
-                                onShareArchive = { archive ->
-                                    shareBuiltArchive(context, archive, viewModel::recordException)
-                                },
-                                onExportArchive = { archive ->
-                                    pendingExportArchive = archive
-                                    saveArchiveLauncher.launch(archive.fileName)
-                                }
-                            )
-
-                            PackFlowTab.INSPECTOR -> InspectorScreen(
-                                telemetry = uiState.runtimeTelemetry,
-                                onRefresh = { viewModel.refreshRuntimeTelemetry(context) },
-                                onStageReport = viewModel::stageTelemetryReport
-                            )
-
-                            PackFlowTab.ERROR_LOG -> ErrorLogScreen(
-                                telemetry = uiState.runtimeTelemetry,
-                                caughtExceptions = uiState.caughtExceptions,
-                                claudeDiagnostics = uiState.claudeDiagnostics,
-                                onCopyLog = viewModel::buildFormattedErrorLog,
-                                onTriggerTestException = viewModel::triggerSampleExceptionForTesting,
-                                onClearLogs = viewModel::clearCaughtExceptions,
-                                onCopySuccessBanner = { }
-                            )
+                        },
+                        onEditEntry = viewModel::openEditEntry,
+                        onRemoveEntry = viewModel::removeStagedEntry,
+                        onBuildZipPackage = { viewModel.packageCurrentStagingToZip(context) },
+                        onShareArchive = { archive ->
+                            shareBuiltArchive(context, archive, viewModel::recordException)
+                        },
+                        onExportArchive = { archive ->
+                            pendingExportArchive = archive
+                            saveArchiveLauncher.launch(archive.fileName)
                         }
-                    }
+                    )
+
+                    PackFlowTab.INSPECTOR -> InspectorScreen(
+                        telemetry = uiState.runtimeTelemetry,
+                        onRefresh = { viewModel.refreshRuntimeTelemetry(context) },
+                        onStageReport = viewModel::stageTelemetryReport
+                    )
+
+                    PackFlowTab.ERROR_LOG -> ErrorLogScreen(
+                        telemetry = uiState.runtimeTelemetry,
+                        caughtExceptions = uiState.caughtExceptions,
+                        claudeDiagnostics = uiState.claudeDiagnostics,
+                        onCopyLog = viewModel::buildFormattedErrorLog,
+                        onTriggerTestException = viewModel::triggerSampleExceptionForTesting,
+                        onClearLogs = viewModel::clearCaughtExceptions,
+                        onCopySuccessBanner = { }
+                    )
                 }
             }
         }
@@ -409,6 +335,42 @@ fun PackFlowApp(
                 viewModel.addOrUpdateTextFile(path, content, existingId = editing.id)
             }
         )
+    }
+}
+
+@Composable
+private fun PipelineTabRow(
+    active: PackFlowTab,
+    errorCount: Int,
+    onSelect: (PackFlowTab) -> Unit
+) {
+    ScrollableTabRow(
+        selectedTabIndex = active.ordinal,
+        edgePadding = 12.dp,
+        containerColor = MaterialTheme.colorScheme.background,
+        modifier = Modifier.testTag("pipeline_tab_row")
+    ) {
+        PackFlowTab.entries.forEach { tab ->
+            Tab(
+                selected = tab == active,
+                onClick = { onSelect(tab) },
+                modifier = Modifier.testTag("pipeline_tab_${tab.name.lowercase()}"),
+                text = {
+                    if (tab == PackFlowTab.ERROR_LOG && errorCount > 0) {
+                        BadgedBox(badge = { Badge { Text(errorCount.toString()) } }) {
+                            Text(tab.title)
+                        }
+                    } else {
+                        Text(
+                            text = tab.title,
+                            textAlign = TextAlign.Center,
+                            color = if (tab.step == null) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                }
+            )
+        }
     }
 }
 

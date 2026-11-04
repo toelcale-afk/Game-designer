@@ -6,6 +6,7 @@ import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.ClaudeApkConverter
+import com.example.data.GitHubBuildController
 import com.example.data.ClaudePresetTemplate
 import com.example.data.PackagerEngine
 import com.example.model.BuiltArchive
@@ -33,7 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 data class PackFlowUiState(
-    val activeTab: PackFlowTab = PackFlowTab.INSTALL_APK,
+    val activeTab: PackFlowTab = PackFlowTab.PREVIEW,
     // Claude-to-APK & Live Device Preview state
     val claudeRawInput: String = "",
     val claudeConfig: ClaudeApkConfig = ClaudeApkConfig(),
@@ -75,6 +76,9 @@ class PackFlowViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(PackFlowUiState())
     val uiState: StateFlow<PackFlowUiState> = _uiState.asStateFlow()
+
+    /** Step 3 GitHub Actions build (push, watch, download APK). */
+    val gitHub = GitHubBuildController(viewModelScope)
 
     init {
         val defaultPreset = ClaudeApkConverter.presets.first()
@@ -240,6 +244,17 @@ class PackFlowViewModel : ViewModel() {
 
     fun toggleLivePreviewFullScreen(fullScreen: Boolean) {
         _uiState.update { it.copy(isLivePreviewFullScreen = fullScreen) }
+    }
+
+    /** The full generated Android project as (path, bytes), used by the GitHub build. */
+    fun generatedProjectFiles(): List<Pair<String, ByteArray>> {
+        val state = _uiState.value
+        return ClaudeApkConverter.generateApkProjectEntries(state.claudeConfig, state.claudeExtractedFiles)
+            .map { it.relativePath to it.bytes }
+    }
+
+    fun pushAndBuildOnGitHub(context: Context) {
+        gitHub.pushAndBuild(context, _uiState.value.claudeConfig.appName, generatedProjectFiles())
     }
 
     fun packageClaudeFilesIntoApkZip(context: Context) {

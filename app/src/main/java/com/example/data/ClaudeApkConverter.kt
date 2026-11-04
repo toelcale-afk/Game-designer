@@ -1,5 +1,6 @@
 package com.example.data
 
+import com.example.core.GeneratedProjectFiles
 import com.example.model.ClaudeApkConfig
 import com.example.model.ClaudeArtifactType
 import com.example.model.ClaudeDiagnosticIssue
@@ -962,46 +963,24 @@ export default function BrokenDashboard() {
             )
         )
 
-        val buildGradleContent = """
-plugins {
-    id("com.android.application") version "8.7.2"
-    id("org.jetbrains.kotlin.android") version "2.0.21"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21"
-}
-
-android {
-    namespace = "${config.applicationId}"
-    compileSdk = 35
-
-    defaultConfig {
-        applicationId = "${config.applicationId}"
-        minSdk = 24
-        targetSdk = 35
-        versionCode = 1
-        versionName = "${config.versionName}"
-    }
-
-    buildFeatures {
-        compose = true
-    }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-}
-
-dependencies {
-    implementation(platform("androidx.compose:compose-bom:2024.10.01"))
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.webkit:webkit:1.12.1")
-}
-        """.trimIndent()
         entries.add(
             PackagerEngine.createTextEntry(
                 relativePath = "app/build.gradle.kts",
-                content = buildGradleContent,
+                content = GeneratedProjectFiles.appBuildGradle(config),
+                category = StagedEntryCategory.CONFIG_MANIFEST
+            )
+        )
+        entries.add(
+            PackagerEngine.createTextEntry(
+                relativePath = "build.gradle.kts",
+                content = GeneratedProjectFiles.ROOT_BUILD_GRADLE,
+                category = StagedEntryCategory.CONFIG_MANIFEST
+            )
+        )
+        entries.add(
+            PackagerEngine.createTextEntry(
+                relativePath = "gradle.properties",
+                content = GeneratedProjectFiles.GRADLE_PROPERTIES,
                 category = StagedEntryCategory.CONFIG_MANIFEST
             )
         )
@@ -1033,39 +1012,7 @@ include(":app")
         )
 
         if (config.includeGithubActionsApkBuilder) {
-            val workflowYaml = """
-name: Build Claude Android APK
-
-on:
-  push:
-    branches: [ "main", "master" ]
-  workflow_dispatch:
-
-jobs:
-  build-apk:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Source
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Compile Debug APK
-        run: gradle assembleDebug
-
-      - name: Upload Compiled APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${config.appName.replace(" ", "-")}-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
-            """.trimIndent()
+            val workflowYaml = GeneratedProjectFiles.workflowYaml(config)
             entries.add(
                 PackagerEngine.createTextEntry(
                     relativePath = ".github/workflows/build-apk.yml",

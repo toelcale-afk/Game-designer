@@ -75,27 +75,25 @@ import com.example.model.ClaudeSourceFile
 import com.example.model.ConsoleLogMessage
 import com.example.model.DiagnosticSeverity
 
+/** Pipeline step 1: paste/import code (or load a project) and run it in the live device frame. */
 @Composable
-fun ClaudeStudioScreen(
+fun PreviewScreen(
     rawInput: String,
     config: ClaudeApkConfig,
     extractedFiles: List<ClaudeSourceFile>,
     diagnostics: List<ClaudeDiagnosticIssue>,
-    runtimeErrors: List<String>,
     consoleLogs: List<ConsoleLogMessage>,
     isFullScreenPreview: Boolean,
     onRawInputChange: (String) -> Unit,
     onSelectPreset: (ClaudePresetTemplate) -> Unit,
     onUpdateConfig: ((ClaudeApkConfig) -> ClaudeApkConfig) -> Unit,
     onImportClaudeFile: () -> Unit,
-    onPackageToApkZip: () -> Unit,
+    onNext: () -> Unit,
     onAppendConsoleLog: (String, String, Int) -> Unit,
     onClearConsole: () -> Unit,
     onToggleFullScreenPreview: (Boolean) -> Unit,
-    onCopyPromptSuccess: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     var reloadNonce by remember { mutableIntStateOf(0) }
 
     val previewHtml = remember(config, extractedFiles, reloadNonce) {
@@ -204,27 +202,7 @@ fun ClaudeStudioScreen(
             )
         }
 
-        // Error Diagnostics & "Copy Error Report for Claude" Card
-        item {
-            ClaudeDiagnosticsCard(
-                config = config,
-                files = extractedFiles,
-                diagnostics = diagnostics,
-                runtimeErrors = runtimeErrors,
-                onCopyReport = {
-                    val report = ClaudeApkConverter.buildCopyableErrorReportForClaude(
-                        config = config,
-                        files = extractedFiles,
-                        diagnostics = diagnostics,
-                        runtimeErrors = runtimeErrors
-                    )
-                    copyTextToClipboard(context, "Claude APK Error Report", report)
-                    onCopyPromptSuccess("Copied detailed error explanation & code fix prompt to clipboard!")
-                }
-            )
-        }
-
-        // Claude Code Input & APK Packaging Card
+        // Code input card
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -299,15 +277,16 @@ fun ClaudeStudioScreen(
                     )
 
                     Button(
-                        onClick = onPackageToApkZip,
+                        onClick = onNext,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp)
-                            .testTag("package_claude_to_apk_button")
+                            .testTag("preview_next_button")
                     ) {
-                        Icon(Icons.Default.FolderZip, contentDescription = null)
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text("Convert & Package into Android APK Project (.ZIP)")
+                        Text(
+                            if (diagnostics.isEmpty()) "Next: 2 Icon"
+                            else "Next: 2 Icon (${diagnostics.size} issue(s) to check in step 3)"
+                        )
                     }
                 }
             }
@@ -504,7 +483,7 @@ private fun LiveEmulatorPreviewCard(
 }
 
 @Composable
-private fun ClaudeDiagnosticsCard(
+internal fun ClaudeDiagnosticsCard(
     config: ClaudeApkConfig,
     files: List<ClaudeSourceFile>,
     diagnostics: List<ClaudeDiagnosticIssue>,

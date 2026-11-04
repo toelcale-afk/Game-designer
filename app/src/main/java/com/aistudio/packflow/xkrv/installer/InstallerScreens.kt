@@ -99,6 +99,25 @@ object InstallerSession {
         }
     }
 
+    /** Opens an APK file PackFlow produced itself (pipeline step 3 -> 4). */
+    fun openFile(context: Context, file: java.io.File) {
+        busy = true
+        message = null
+        InstallEvents.set(InstallState.Idle)
+        scope.launch {
+            try {
+                apk = ApkInspector.inspectFile(context.applicationContext, file)
+                screen = InstallerScreen.Preview
+            } catch (t: Throwable) {
+                ErrorLog.error("Could not read the built APK", t)
+                message = t.message ?: "Could not read the built APK"
+                screen = InstallerScreen.Pick
+            } finally {
+                busy = false
+            }
+        }
+    }
+
     fun openSample(context: Context) {
         busy = true
         message = null

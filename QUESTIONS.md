@@ -34,3 +34,23 @@ Each item lists the decision I needed, the default I used, and how to change it.
    `CLAUDE_INSTALLER_README.md` (already merged into the manifest).
    - Kept `preview.html` at the root (the AI Studio HTML preview) and
      `app/src/main/assets/apk-preview.html` (opened by the installer).
+
+## Phase 1
+
+5. **Navigation:** seven tabs don't fit a bottom bar, so the pipeline uses a scrollable tab row
+   under the title (main steps numbered 1-4, extras unnumbered).
+   **Default used:** scrollable tab row.
+
+6. **GitHub token type:** the panel asks for a fine-grained token limited to the build repo
+   (Contents RW, Actions R, Workflows RW). Classic tokens with `repo` + `workflow` also work.
+
+7. **Generated project toolchain:** generated apps use AGP 8.7.2 / Kotlin 2.0.21 / Gradle 8.11.1
+   (a stable, widely cached set), independent of PackFlow's own AGP 9.1.1 build.
+   **Default used:** keep them separate so generated builds don't break when AI Studio
+   updates PackFlow.
+
+8. **I couldn't push to GitHub from this session** (403 for both git push and the API: the
+   Claude GitHub App has read-only access). All work is committed locally on
+   `claude/packflow-studio-android-5318tj`. I attached a git bundle of the branch so nothing is
+   lost; see the final message. To give write access, install the Claude GitHub App with
+   write permission on the repo.
