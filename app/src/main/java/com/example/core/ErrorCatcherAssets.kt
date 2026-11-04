@@ -1,0 +1,378 @@
+package com.example.core
+
+// GENERATED from reusable/error-catcher/ (the canonical copies). Edit those files, then
+// regenerate. ErrorCatcherTest fails if the two drift apart.
+@Suppress("MaxLineLength")
+internal object ErrorCatcherAssets {
+    const val JS = """/* PackFlow error catcher v1. Drop-in, no dependencies. Load it FIRST in <head>.
+ * Catches window errors, unhandled promise rejections and console.error, keeps the last 50
+ * (message, file, line, column, stack, time) in localStorage and shows a small floating
+ * "Copy errors" button when there are any. If the page runs inside an Android app that
+ * exposes window.PackFlowAndroid, each error is also sent to the app's crash log.
+ * API: PackFlowErrors.list(), .clear(), .copy(), .report(err), .text()
+ */
+(function () {
+  'use strict';
+  if (window.PackFlowErrors) return;
+  var KEY = '__packflow_errors';
+  var MAX = 50;
+  var errors = [];
+  try { errors = JSON.parse(localStorage.getItem(KEY) || '[]') || []; } catch (e) { errors = []; }
+  var bridge = window.PackFlowAndroid || null;
+  var origError = console.error ? console.error.bind(console) : function () {};
+  var button = null;
+  var busy = false;
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(errors.slice(-MAX))); } catch (e) { /* storage full or blocked */ }
+  }
+
+  function str(v) {
+    if (v instanceof Error) return v.name + ': ' + v.message;
+    if (typeof v === 'string') return v;
+    try { return JSON.stringify(v); } catch (e) { return String(v); }
+  }
+
+  function add(entry) {
+    if (busy) return;
+    busy = true;
+    try {
+      entry.time = new Date().toISOString();
+      entry.page = location.pathname.split('/').pop() || 'index.html';
+      errors.push(entry);
+      if (errors.length > MAX) errors.splice(0, errors.length - MAX);
+      save();
+      if (bridge && bridge.logError) {
+        try { bridge.logError(JSON.stringify(entry)); } catch (e) { /* bridge gone */ }
+      }
+      render();
+    } finally {
+      busy = false;
+    }
+  }
+
+  function text() {
+    if (!errors.length) return 'No errors recorded.';
+    var lines = ['Errors from ' + (document.title || location.href) + ' (' + errors.length + ')', 'User agent: ' + navigator.userAgent, ''];
+    errors.forEach(function (e, i) {
+      lines.push((i + 1) + '. [' + e.type + '] ' + e.message);
+      lines.push('   at ' + (e.file || '?') + ':' + (e.line || 0) + ':' + (e.column || 0) + '  (' + e.time + ')');
+      if (e.stack) lines.push('   ' + String(e.stack).split('\n').slice(0, 8).join('\n   '));
+      lines.push('');
+    });
+    return lines.join('\n');
+  }
+
+  function fallbackCopy(t) {
+    var ta = document.createElement('textarea');
+    ta.value = t;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  function copy() {
+    var t = text();
+    if (bridge && bridge.copyText) {
+      try { bridge.copyText(t); flash('Copied'); return Promise.resolve(true); } catch (e) { /* fall through */ }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(t).then(function () { flash('Copied'); return true; }, function () {
+        var ok = fallbackCopy(t); flash(ok ? 'Copied' : 'Copy failed'); return ok;
+      });
+    }
+    var ok = fallbackCopy(t);
+    flash(ok ? 'Copied' : 'Copy failed');
+    return Promise.resolve(ok);
+  }
+
+  function flash(msg) {
+    if (!button) return;
+    button.textContent = msg;
+    setTimeout(render, 1200);
+  }
+
+  function render() {
+    if (!document.body) return;
+    if (!errors.length) {
+      if (button) { button.remove(); button = null; }
+      return;
+    }
+    if (!button) {
+      button = document.createElement('button');
+      button.id = 'packflow-copy-errors';
+      button.type = 'button';
+      button.style.cssText = 'position:fixed;right:10px;bottom:10px;z-index:2147483647;' +
+        'background:#B91C1C;color:#fff;border:0;border-radius:18px;padding:8px 12px;' +
+        'font:600 12px system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.4);opacity:.92';
+      button.addEventListener('click', function (ev) { ev.stopPropagation(); copy(); });
+      button.addEventListener('contextmenu', function (ev) { ev.preventDefault(); clear(); });
+      document.body.appendChild(button);
+    }
+    button.textContent = 'Copy errors (' + errors.length + ')';
+    button.title = 'Tap to copy. Long-press to clear.';
+  }
+
+  function clear() {
+    errors = [];
+    save();
+    if (bridge && bridge.clearErrors) { try { bridge.clearErrors(); } catch (e) { /* ignore */ } }
+    render();
+  }
+
+  window.addEventListener('error', function (ev) {
+    var t = ev.target;
+    if (t && t !== window && (t.src || t.href)) {
+      add({ type: 'resource', message: 'Failed to load ' + (t.tagName || '').toLowerCase() + ': ' + (t.src || t.href), file: t.src || t.href, line: 0, column: 0, stack: '' });
+      return;
+    }
+    var err = ev.error;
+    add({
+      type: 'error',
+      message: ev.message || str(err),
+      file: ev.filename || '',
+      line: ev.lineno || 0,
+      column: ev.colno || 0,
+      stack: err && err.stack ? String(err.stack) : ''
+    });
+  }, true);
+
+  window.addEventListener('unhandledrejection', function (ev) {
+    var r = ev.reason;
+    add({
+      type: 'promise',
+      message: 'Unhandled promise rejection: ' + str(r),
+      file: '', line: 0, column: 0,
+      stack: r && r.stack ? String(r.stack) : ''
+    });
+  });
+
+  console.error = function () {
+    var args = Array.prototype.slice.call(arguments);
+    origError.apply(null, args);
+    var firstErr = args.filter(function (a) { return a instanceof Error; })[0];
+    var where = (new Error().stack || '').split('\n')[2] || '';
+    var m = /([^\s(]+):(\d+):(\d+)\)?\s*$/.exec(where);
+    add({
+      type: 'console',
+      message: args.map(str).join(' '),
+      file: m ? m[1] : '',
+      line: m ? +m[2] : 0,
+      column: m ? +m[3] : 0,
+      stack: firstErr && firstErr.stack ? String(firstErr.stack) : ''
+    });
+  };
+
+  window.PackFlowErrors = {
+    list: function () { return errors.slice(); },
+    clear: clear,
+    copy: copy,
+    text: text,
+    report: function (err) { add({ type: 'manual', message: str(err), file: '', line: 0, column: 0, stack: err && err.stack ? String(err.stack) : '' }); }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', render);
+  } else {
+    render();
+  }
+})();
+"""
+
+    const val ANDROID_KT_TEMPLATE = """package com.example.yourapp
+
+import android.app.Activity
+import android.app.AlertDialog
+import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.webkit.JavascriptInterface
+import android.widget.Toast
+import java.io.File
+import java.io.PrintWriter
+import java.io.StringWriter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+/**
+ * PackFlow error catcher, Android side (framework APIs only, no dependencies).
+ *
+ * - Saves any uncaught exception to filesDir/packflow_errors/last_crash.txt.
+ * - Web errors from error-catcher.js arrive through [PackFlowErrorBridge] and go to the
+ *   same log (filesDir/packflow_errors/error_log.txt).
+ * - On the next launch, the first screen shows "Copy last crash".
+ *
+ * Setup: register PackFlowApplication in the manifest (android:name=".PackFlowApplication"),
+ * or call PackFlowCrashCatcher.install(this) from your own Application.onCreate().
+ * For WebViews: webView.addJavascriptInterface(PackFlowErrorBridge(context), "PackFlowAndroid").
+ */
+object PackFlowCrashCatcher {
+    private const val DIR = "packflow_errors"
+    private const val CRASH_FILE = "last_crash.txt"
+    private const val LOG_FILE = "error_log.txt"
+    private const val MAX_LOG_BYTES = 64 * 1024
+
+    @Volatile
+    private var installed = false
+
+    fun install(app: Application) {
+        if (installed) return
+        installed = true
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            try {
+                writeCrash(app, thread, error)
+            } catch (ignored: Throwable) {
+            }
+            if (previous != null) {
+                previous.uncaughtException(thread, error)
+            } else {
+                android.os.Process.killProcess(android.os.Process.myPid())
+                System.exit(10)
+            }
+        }
+        app.registerActivityLifecycleCallbacks(object : Application.ActivityLifecycleCallbacks {
+            private var offered = false
+            override fun onActivityResumed(activity: Activity) {
+                if (!offered) {
+                    offered = true
+                    offerLastCrash(activity)
+                }
+            }
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+            override fun onActivityStarted(activity: Activity) {}
+            override fun onActivityPaused(activity: Activity) {}
+            override fun onActivityStopped(activity: Activity) {}
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
+            override fun onActivityDestroyed(activity: Activity) {}
+        })
+    }
+
+    private fun dir(context: Context): File = File(context.filesDir, DIR).apply { mkdirs() }
+
+    private fun stamp(): String = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+
+    private fun header(context: Context): String {
+        val version = try {
+            val info = context.packageManager.getPackageInfo(context.packageName, 0)
+            info.versionName ?: "?"
+        } catch (e: Throwable) {
+            "?"
+        }
+        return context.packageName + " " + version + " | Android " + Build.VERSION.RELEASE +
+            " (API " + Build.VERSION.SDK_INT + ") | " + Build.MANUFACTURER + " " + Build.MODEL
+    }
+
+    fun writeCrash(context: Context, thread: Thread, error: Throwable) {
+        val trace = StringWriter()
+        error.printStackTrace(PrintWriter(trace))
+        val text = "CRASH " + stamp() + " on thread '" + thread.name + "'\n" +
+            header(context) + "\n\n" + trace.toString()
+        File(dir(context), CRASH_FILE).writeText(text)
+        appendLog(context, "CRASH", error.toString())
+    }
+
+    @Synchronized
+    fun appendLog(context: Context, kind: String, message: String) {
+        val f = File(dir(context), LOG_FILE)
+        if (f.exists() && f.length() > MAX_LOG_BYTES) {
+            val keep = f.readText().takeLast(MAX_LOG_BYTES / 2)
+            f.writeText(keep)
+        }
+        f.appendText(stamp() + " " + kind + " " + message.replace('\n', ' ') + "\n")
+    }
+
+    fun lastCrash(context: Context): String? {
+        val f = File(dir(context), CRASH_FILE)
+        return if (f.exists()) f.readText() else null
+    }
+
+    fun recentLog(context: Context, lines: Int = 30): String {
+        val f = File(dir(context), LOG_FILE)
+        return if (f.exists()) f.readLines().takeLast(lines).joinToString("\n") else ""
+    }
+
+    fun clearLastCrash(context: Context) {
+        File(dir(context), CRASH_FILE).delete()
+    }
+
+    fun clearLog(context: Context) {
+        File(dir(context), LOG_FILE).delete()
+    }
+
+    /** Full text for "Copy last crash": the crash plus the most recent web/app errors. */
+    fun reportText(context: Context): String {
+        val crash = lastCrash(context) ?: "No crash recorded."
+        val log = recentLog(context)
+        return if (log.isBlank()) crash else crash + "\n\nRecent errors:\n" + log
+    }
+
+    fun copyToClipboard(context: Context, label: String, text: String) {
+        Handler(Looper.getMainLooper()).post {
+            val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText(label, text))
+            Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun offerLastCrash(activity: Activity) {
+        val crash = lastCrash(activity) ?: return
+        val preview = crash.lines().take(8).joinToString("\n")
+        try {
+            AlertDialog.Builder(activity)
+                .setTitle("The app closed unexpectedly last time")
+                .setMessage(preview)
+                .setPositiveButton("Copy last crash") { _, _ ->
+                    copyToClipboard(activity.applicationContext, "Last crash", reportText(activity))
+                    clearLastCrash(activity)
+                }
+                .setNegativeButton("Dismiss") { _, _ -> clearLastCrash(activity) }
+                .show()
+        } catch (ignored: Throwable) {
+        }
+    }
+}
+
+/** Register this as android:name in <application> to switch the catcher on. */
+class PackFlowApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        PackFlowCrashCatcher.install(this)
+    }
+}
+
+/** JavaScript bridge used by error-catcher.js (exposed as window.PackFlowAndroid). */
+class PackFlowErrorBridge(context: Context) {
+    private val appContext = context.applicationContext
+
+    @JavascriptInterface
+    fun logError(json: String) {
+        PackFlowCrashCatcher.appendLog(appContext, "WEB", json)
+    }
+
+    @JavascriptInterface
+    fun copyText(text: String) {
+        PackFlowCrashCatcher.copyToClipboard(appContext, "Errors", text)
+    }
+
+    @JavascriptInterface
+    fun clearErrors() {
+        PackFlowCrashCatcher.clearLog(appContext)
+    }
+
+    @JavascriptInterface
+    fun lastCrash(): String = PackFlowCrashCatcher.lastCrash(appContext) ?: ""
+}
+"""
+}

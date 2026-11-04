@@ -20,4 +20,18 @@ class GeneratedProjectFilesTest {
         assertTrue(gradle.contains("applicationId = \"com.me.game\""))
         assertTrue(GeneratedProjectFiles.ROOT_BUILD_GRADLE.contains(GeneratedProjectFiles.AGP_VERSION))
     }
+
+    @Test
+    fun readsKotlinPackage() {
+        org.junit.Assert.assertEquals("com.claude.habitflow", GeneratedProjectFiles.kotlinPackageOf("// x\npackage com.claude.habitflow\n\nimport a.b"))
+        org.junit.Assert.assertNull(GeneratedProjectFiles.kotlinPackageOf("fun main() {}"))
+    }
+
+    @Test
+    fun manifestRegistersCrashCatcherAndEscapesName() {
+        val xml = GeneratedProjectFiles.manifestXml("Tom & Jerry's", "a.b.MainActivity", "a.b.PackFlowApplication", hasIcon = true)
+        assertTrue(xml.contains("android:name=\"a.b.PackFlowApplication\""))
+        assertTrue(xml.contains("android:label=\"Tom &amp; Jerry\\'s\""))
+        assertTrue(xml.contains("@mipmap/ic_launcher_round"))
+    }
 }

@@ -141,4 +141,40 @@ jobs:
           retention-days: 1
 """
     }
+
+    private val PACKAGE_LINE = Regex("(?m)^\\s*package\\s+([A-Za-z_][A-Za-z0-9_]*(?:\\.[A-Za-z_][A-Za-z0-9_]*)*)")
+
+    fun kotlinPackageOf(source: String): String? = PACKAGE_LINE.find(source)?.groupValues?.get(1)
+
+    fun xmlEscape(s: String): String = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        .replace("\"", "&quot;").replace("'", "\\'")
+
+    fun manifestXml(appName: String, activityClass: String, applicationClass: String, hasIcon: Boolean): String {
+        val icon = if (hasIcon) {
+            "\n        android:icon=\"@mipmap/ic_launcher\"\n        android:roundIcon=\"@mipmap/ic_launcher_round\""
+        } else ""
+        return """<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:name="$applicationClass"
+        android:allowBackup="true"
+        android:label="${xmlEscape(appName)}"$icon
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+        <activity
+            android:name="$activityClass"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
+"""
+    }
 }

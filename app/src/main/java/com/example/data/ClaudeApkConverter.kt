@@ -1,5 +1,6 @@
 package com.example.data
 
+import com.example.core.ErrorCatcher
 import com.example.core.GeneratedProjectFiles
 import com.example.model.ClaudeApkConfig
 import com.example.model.ClaudeArtifactType
@@ -628,24 +629,13 @@ export default function BrokenDashboard() {
         }
     }
 
-    /**
-     * Global JS error trap script injected into every WebView preview so any runtime exception
-     * or unhandled promise rejection is surfaced in plain English in the error banner and console.
-     */
-    private val runtimeErrorTrapScript = """
-      window.addEventListener('error', function(event) {
-        var msg = event.message || 'Unknown runtime error';
-        var line = event.lineno || 1;
-        var col = event.colno || 1;
-        console.error('[RUNTIME_EXCEPTION] ' + msg + ' (Line ' + line + ', Col ' + col + ')');
-      });
-      window.addEventListener('unhandledrejection', function(event) {
-        var reason = (event.reason && event.reason.message) ? event.reason.message : String(event.reason);
-        console.error('[UNHANDLED_PROMISE] ' + reason);
-      });
-    """.trimIndent()
-
+    /** The single-page HTML used by the live preview and the APK, with the error catcher first in <head>. */
     fun buildStandaloneWebApkHtml(
+        config: ClaudeApkConfig,
+        files: List<ClaudeSourceFile>
+    ): String = ErrorCatcher.injectIntoHtml(buildWebHtmlWithoutCatcher(config, files))
+
+    private fun buildWebHtmlWithoutCatcher(
         config: ClaudeApkConfig,
         files: List<ClaudeSourceFile>
     ): String {
@@ -683,7 +673,7 @@ export default function BrokenDashboard() {
                     "<style>\n$combinedCss\n</style>\n$enriched"
                 }
             }
-            val scriptBlock = "<script>\n$runtimeErrorTrapScript\n$combinedJs\n</script>"
+            val scriptBlock = "<script>\n$combinedJs\n</script>"
             enriched = if (enriched.contains("</body>", ignoreCase = true)) {
                 enriched.replaceFirst(Regex("(?i)</body>"), "$scriptBlock\n</body>")
             } else {
@@ -706,7 +696,6 @@ export default function BrokenDashboard() {
 <body>
   $mainHtml
   <script>
-    $runtimeErrorTrapScript
     window.AndroidApkBridge = window.AndroidApkBridge || {
       getAppName: () => "${config.appName}",
       getPackageName: () => "${config.applicationId}",
@@ -785,7 +774,6 @@ export default function BrokenDashboard() {
   </div>
 
   <script>
-    $runtimeErrorTrapScript
     function recalcUnit(logIt) {
       const val = parseFloat(document.getElementById('reactInputVal').value || '0');
       const mode = document.getElementById('reactUnitSelect').value;
@@ -877,7 +865,6 @@ export default function BrokenDashboard() {
     </details>
   </div>
   <script>
-    $runtimeErrorTrapScript
     let counters = [7, 5, 1];
     function bumpComposeState(idx, label) {
       counters[idx] = (counters[idx] || 0) + 1;
@@ -893,9 +880,15 @@ export default function BrokenDashboard() {
         """.trimIndent()
     }
 
+    /**
+     * Builds the full Android project. [iconPngs] maps project paths
+     * (e.g. app/src/main/res/mipmap-xxhdpi/ic_launcher.png) to PNG bytes from the icon maker.
+     */
     fun generateApkProjectEntries(
         config: ClaudeApkConfig,
-        claudeFiles: List<ClaudeSourceFile>
+        claudeFiles: List<ClaudeSourceFile>,
+        iconPngs: Map<String, ByteArray> = emptyMap(),
+        iconXml: Map<String, String> = emptyMap()
     ): List<StagedEntry> {
         val pkgPath = config.applicationId.replace('.', '/')
         val entries = mutableListOf<StagedEntry>()
@@ -919,42 +912,37 @@ export default function BrokenDashboard() {
         )
 
         val ktSource = claudeFiles.firstOrNull { it.fileName.endsWith(".kt") || it.language == "kotlin" }
-        val mainActivityContent = if (config.artifactType == ClaudeArtifactType.KOTLIN_COMPOSE && ktSource != null) {
-            ktSource.content
+        val isCompose = config.artifactType == ClaudeArtifactType.KOTLIN_COMPOSE && ktSource != null
+        // Compose sources keep their own package; the web host lives in the applicationId package.
+        val activityPackage = if (isCompose) {
+            GeneratedProjectFiles.kotlinPackageOf(ktSource!!.content) ?: config.applicationId
         } else {
-            generateWebViewHostActivityKt(config)
+            config.applicationId
         }
+        val mainActivityContent = if (isCompose) ktSource!!.content else generateWebViewHostActivityKt(config)
         entries.add(
             PackagerEngine.createTextEntry(
-                relativePath = "app/src/main/java/$pkgPath/MainActivity.kt",
+                relativePath = "app/src/main/java/${activityPackage.replace('.', '/')}/MainActivity.kt",
                 content = mainActivityContent,
                 category = StagedEntryCategory.SOURCE_CODE
             )
         )
 
-        val manifestContent = """
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+        // Phase 2: crash catcher + JS bridge in every generated app.
+        entries.add(
+            PackagerEngine.createTextEntry(
+                relativePath = "app/src/main/java/$pkgPath/${ErrorCatcher.ANDROID_FILE_NAME}",
+                content = ErrorCatcher.androidKotlin(config.applicationId),
+                category = StagedEntryCategory.SOURCE_CODE
+            )
+        )
 
-    <uses-permission android:name="android.permission.INTERNET" />
-
-    <application
-        android:allowBackup="true"
-        android:label="${config.appName}"
-        android:supportsRtl="true"
-        android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
-        <activity
-            android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-    </application>
-</manifest>
-        """.trimIndent()
+        val manifestContent = GeneratedProjectFiles.manifestXml(
+            appName = config.appName,
+            activityClass = "$activityPackage.MainActivity",
+            applicationClass = "${config.applicationId}.PackFlowApplication",
+            hasIcon = iconPngs.isNotEmpty()
+        )
         entries.add(
             PackagerEngine.createTextEntry(
                 relativePath = "app/src/main/AndroidManifest.xml",
@@ -1022,6 +1010,11 @@ include(":app")
             )
         }
 
+        iconPngs.forEach { (path, bytes) -> entries.add(PackagerEngine.createBinaryEntry(path, bytes)) }
+        iconXml.forEach { (path, xml) ->
+            entries.add(PackagerEngine.createTextEntry(path, xml, StagedEntryCategory.CONFIG_MANIFEST))
+        }
+
         val readme = """
 # ${config.appName} (Claude-to-APK Package)
 
@@ -1076,6 +1069,8 @@ class MainActivity : ComponentActivity() {
             settings.allowFileAccess = true
             webViewClient = WebViewClient()
             webChromeClient = WebChromeClient()
+            // PackFlow error catcher: web errors go to the same log as crashes.
+            addJavascriptInterface(PackFlowErrorBridge(this@MainActivity), "${ErrorCatcher.BRIDGE_NAME}")
             if (${config.enableJsBridge}) {
                 addJavascriptInterface(ClaudeAndroidBridge(), "AndroidApkBridge")
             }

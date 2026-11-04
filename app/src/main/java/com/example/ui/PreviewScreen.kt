@@ -5,6 +5,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.webkit.ConsoleMessage
+import android.webkit.JavascriptInterface
+import com.aistudio.packflow.xkrv.installer.ErrorLog
+import com.example.core.ErrorCatcher
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -623,6 +626,7 @@ private fun EmbeddedClaudeWebView(
             WebView(ctx).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
+                addJavascriptInterface(PreviewErrorBridge(ctx.applicationContext), ErrorCatcher.BRIDGE_NAME)
                 webViewClient = WebViewClient()
                 webChromeClient = object : WebChromeClient() {
                     override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
@@ -655,6 +659,25 @@ private fun EmbeddedClaudeWebView(
             )
         }
     )
+}
+
+/** window.PackFlowAndroid inside PackFlow's own preview: web errors go to PackFlow's Error Log. */
+class PreviewErrorBridge(private val context: Context) {
+    @JavascriptInterface
+    fun logError(json: String) {
+        ErrorLog.error("Preview: " + json.take(600))
+    }
+
+    @JavascriptInterface
+    fun copyText(text: String) {
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            copyTextToClipboard(context, "Preview errors", text)
+        }
+    }
+
+    @JavascriptInterface
+    fun clearErrors() {
+    }
 }
 
 fun copyTextToClipboard(context: Context, label: String, text: String) {
