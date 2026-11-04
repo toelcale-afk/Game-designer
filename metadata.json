@@ -1,0 +1,6 @@
+{
+  "name": "PackFlow Studio",
+  "description": "Android app bundler, ZIP archive packager, and APK manifest & package inspector.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

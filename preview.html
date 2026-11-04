@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PackFlow · APK Preview</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --card:#ffffff; --text:#14161c; --muted:#5b6170; --line:#e3e6ee;
+    --accent:#2f5bea; --accent-ink:#ffffff; --error:#c62828; --warn:#a15c00; --chip:#eef1fb;
+    --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#0f1115; --card:#181b22; --text:#e8eaf0; --muted:#9aa1b2; --line:#2a2f3a;
+      --accent:#8aa6ff; --accent-ink:#0f1115; --error:#ff8a80; --warn:#ffb74d; --chip:#222838; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px}
+  .top{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .top h1{font-size:18px;margin:0;flex:1}
+  .tag{font-size:12px;color:var(--muted)}
+  .drop{border:2px dashed var(--line);border-radius:16px;padding:28px;text-align:center;background:var(--card)}
+  .drop.over{border-color:var(--accent)}
+  .drop p{color:var(--muted);margin:6px 0 16px}
+  button{font:inherit;border-radius:999px;padding:9px 16px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+  button.small{padding:3px 10px;font-size:12px}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .grid{display:grid;gap:12px}
+  @media (min-width:700px){ .grid.two{grid-template-columns:1fr 1fr;align-items:start} }
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .card h2{font-size:15px;margin:0 0 8px}
+  .head{display:flex;gap:16px;align-items:center}
+  .icon{width:64px;height:64px;border-radius:14px;background:var(--chip);display:grid;place-items:center;overflow:hidden;flex:none;font-weight:600;color:var(--muted)}
+  .icon canvas,.icon img{width:64px;height:64px}
+  .title{font-size:20px;font-weight:600}
+  .mono{font-family:var(--mono);font-size:12.5px;word-break:break-all}
+  .field{padding:4px 0}
+  .field .lbl{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--muted)}
+  .perm{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .perm:last-child{border-bottom:0}
+  .sens{font-size:11px;color:var(--error);white-space:nowrap}
+  .note{font-size:13px;color:var(--muted)}
+  .warn{color:var(--warn);font-size:13px}
+  .err{color:var(--error)}
+  .log{font-family:var(--mono);font-size:12px;max-height:260px;overflow:auto;white-space:pre-wrap}
+  .log .e{color:var(--error)}
+  .chip{display:inline-block;background:var(--chip);border-radius:999px;padding:1px 8px;font-size:12px;margin-right:4px}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>PackFlow · APK Preview</h1>
+    <span class="tag">Standalone preview · nothing leaves this page</span>
+  </div>
+
+  <div id="pick" class="drop">
+    <div class="title">Choose an APK</div>
+    <p>Drop an .apk here, or pick one. It's read locally in your browser.</p>
+    <div class="row" style="justify-content:center">
+      <button class="primary" id="chooseBtn">Choose APK file</button>
+      <button id="sampleBtn">Show sample</button>
+      <button id="logBtn1">Error log</button>
+    </div>
+    <input id="file" type="file" accept=".apk,application/vnd.android.package-archive" class="hidden">
+    <p id="pickMsg" class="err" style="margin-top:14px"></p>
+  </div>
+
+  <div id="preview" class="hidden">
+    <div class="grid two">
+      <div class="grid">
+        <div class="card">
+          <div class="head">
+            <div class="icon" id="icon">APK</div>
+            <div style="min-width:0">
+              <div class="title" id="label"></div>
+              <div class="mono" id="pkg"></div>
+              <div id="ver"></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <button class="primary" style="width:100%" disabled title="Installing happens in the Android app">Install</button>
+          <p class="note" style="margin:8px 0">Preview only. In the app this button hands the APK to Android's system installer.</p>
+          <div class="row">
+            <button id="anotherBtn">Choose another</button>
+            <button id="logBtn2">Error log</button>
+          </div>
+        </div>
+        <div class="card"><h2>Details</h2><div id="details"></div></div>
+      </div>
+      <div class="grid">
+        <div class="card"><h2>Signing</h2><div id="signing"></div></div>
+        <div class="card"><h2 id="permTitle">Permissions</h2><div id="perms"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="logView" class="card hidden" style="margin-top:12px">
+    <div class="row" style="align-items:center;margin-bottom:8px">
+      <h2 style="flex:1;margin:0">Error log</h2>
+      <button class="small primary" id="copyLog">Copy log</button>
+      <button class="small" id="clearLog">Clear</button>
+      <button class="small" id="closeLog">Close</button>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script id="parser">
+/* ---------- APK parsing: pure functions, no DOM ---------- */
+const APK = (() => {
+  const u32 = (dv, p) => dv.getUint32(p, true);
+  const u16 = (dv, p) => dv.getUint16(p, true);
+
+  /* ZIP */
+  function readZip(u8) {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    let eocd = -1;
+    for (let p = u8.length - 22; p >= Math.max(0, u8.length - 65557); p--) {
+      if (u32(dv, p) === 0x06054b50) { eocd = p; break; }
+    }
+    if (eocd < 0) throw new Error("Not a ZIP/APK file (no end-of-central-directory record).");
+    const count = u16(dv, eocd + 10), cdOffset = u32(dv, eocd + 16);
+    const entries = new Map();
+    let p = cdOffset;
+    const dec = new TextDecoder();
+    for (let i = 0; i < count; i++) {
+      if (u32(dv, p) !== 0x02014b50) throw new Error("Corrupt ZIP central directory.");
+      const method = u16(dv, p + 10), csize = u32(dv, p + 20), usize = u32(dv, p + 24);
+      const nl = u16(dv, p + 28), xl = u16(dv, p + 30), cl = u16(dv, p + 32), lho = u32(dv, p + 42);
+      const name = dec.decode(u8.subarray(p + 46, p + 46 + nl));
+      entries.set(name, { name, method, csize, usize, lho });
+      p += 46 + nl + xl + cl;
+    }
+    return { u8, dv, entries, cdOffset };
+  }
+
+  async function inflateRaw(data) {
+    const ds = new DecompressionStream("deflate-raw");
+    const stream = new Blob([data]).stream().pipeThrough(ds);
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  async function readEntry(zip, name) {
+    const e = zip.entries.get(name);
+    if (!e) return null;
+    const { dv, u8 } = zip;
+    if (u32(dv, e.lho) !== 0x04034b50) throw new Error("Bad local header for " + name);
+    const start = e.lho + 30 + u16(dv, e.lho + 26) + u16(dv, e.lho + 28);
+    const raw = u8.subarray(start, start + e.csize);
+    if (e.method === 0) return raw;
+    if (e.method === 8) return inflateRaw(raw);
+    throw new Error("Unsupported compression method " + e.method + " for " + name);
+  }
+
+  /* Android string pool (lazy) */
+  function stringPool(dv, off) {
+    const hs = u16(dv, off + 2), count = u32(dv, off + 8), flags = u32(dv, off + 16), start = u32(dv, off + 20);
+    const utf8 = (flags & 0x100) !== 0, cache = new Map();
+    const d8 = new TextDecoder("utf-8"), d16 = new TextDecoder("utf-16le");
+    return {
+      count,
+      get(i) {
+        if (i == null || i < 0 || i >= count || i === 0xffffffff) return null;
+        if (cache.has(i)) return cache.get(i);
+        let p = off + start + u32(dv, off + hs + i * 4), s;
+        if (utf8) {
+          p += (dv.getUint8(p) & 0x80) ? 2 : 1;
+          let len = dv.getUint8(p);
+          if (len & 0x80) { len = ((len & 0x7f) << 8) | dv.getUint8(p + 1); p += 2; } else p += 1;
+          s = d8.decode(new Uint8Array(dv.buffer, dv.byteOffset + p, len));
+        } else {
+          let len = u16(dv, p); p += 2;
+          if (len & 0x8000) { len = ((len & 0x7fff) << 16) | u16(dv, p); p += 2; }
+          s = d16.decode(new Uint8Array(dv.buffer, dv.byteOffset + p, len * 2));
+        }
+        cache.set(i, s);
+        return s;
+      }
+    };
+  }
+
+  /* Binary XML (AndroidManifest.xml and res/*.xml) */
+  const ATTR_BY_ID = {
+    0x01010003: "name", 0x01010001: "label", 0x01010002: "icon",
+    0x0101021b: "versionCode", 0x0101021c: "versionName",
+    0x0101020c: "minSdkVersion", 0x01010270: "targetSdkVersion",
+    0x01010199: "drawable", 0x01010200: "drawable",
+  };
+  function parseAxml(u8) {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    if (u16(dv, 0) !== 0x0003) throw new Error("Not a compiled Android XML file.");
+    let off = u16(dv, 2), strings = null;
+    const resIds = [], elements = [];
+    while (off + 8 <= u8.length) {
+      const type = u16(dv, off), hs = u16(dv, off + 2), size = u32(dv, off + 4);
+      if (size < 8) break;
+      if (type === 0x0001) strings = stringPool(dv, off);
+      else if (type === 0x0180) { for (let i = 0; i < (size - hs) / 4; i++) resIds.push(u32(dv, off + hs + i * 4)); }
+      else if (type === 0x0102 && strings) {
+        const el = { name: strings.get(u32(dv, off + 20)), attrs: {} };
+        const aStart = u16(dv, off + 24), aSize = u16(dv, off + 26), aCount = u16(dv, off + 28);
+        let a = off + 16 + aStart;
+        for (let i = 0; i < aCount; i++, a += aSize) {
+          const nIdx = u32(dv, a + 4), raw = u32(dv, a + 8), dt = dv.getUint8(a + 15);
+          const key = (nIdx < resIds.length && ATTR_BY_ID[resIds[nIdx]]) || strings.get(nIdx) || ("attr" + nIdx);
+          let val;
+          if (dt === 0x03) val = strings.get(u32(dv, a + 16));
+          else if (dt === 0x01) val = { ref: u32(dv, a + 16) };
+          else if (dt === 0x12) val = u32(dv, a + 16) !== 0;
+          else if (dt === 0x10) val = dv.getInt32(a + 16, true);
+          else if (dt >= 0x1c && dt <= 0x1f) val = { color: u32(dv, a + 16) };
+          else if (raw !== 0xffffffff) val = strings.get(raw);
+          else val = u32(dv, a + 16);
+          el.attrs[key] = val;
+        }
+        elements.push(el);
+      }
+      off += size;
+    }
+    return elements;
+  }
+
+  /* resources.arsc: map resource id -> [{lang, density, dt, data}] */
+  function parseArsc(u8) {
+    const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    const map = new Map();
+    let off = u16(dv, 2), global = null;
+    const pkgs = [];
+    while (off + 8 <= u8.length) {
+      const type = u16(dv, off), size = u32(dv, off + 4);
+      if (size < 8) break;
+      if (type === 0x0001) global = stringPool(dv, off);
+      else if (type === 0x0200) pkgs.push([off, size]);
+      off += size;
+    }
+    for (const [pOff, pSize] of pkgs) {
+      const pid = u32(dv, pOff + 8) & 0xff;
+      let c = pOff + u16(dv, pOff + 2);
+      const pEnd = pOff + pSize;
+      while (c + 8 <= pEnd) {
+        const t = u16(dv, c), h = u16(dv, c + 2), s = u32(dv, c + 4);
+        if (s < 8) break;
+        if (t === 0x0201) {
+          const typeId = dv.getUint8(c + 8), flags = dv.getUint8(c + 9);
+          const n = u32(dv, c + 12), entriesStart = u32(dv, c + 16), cfg = c + 20;
+          const lang = u16(dv, cfg + 8), density = u16(dv, cfg + 14);
+          const add = (idx, eo) => {
+            const e = c + entriesStart + eo;
+            const esize = u16(dv, e), ef = u16(dv, e + 2);
+            let dt, data;
+            if (ef & 0x8) { dt = ef >> 8; data = u32(dv, e + 4); }
+            else if (ef & 0x1) return; // complex/bag entry
+            else { dt = dv.getUint8(e + esize + 3); data = u32(dv, e + esize + 4); }
+            const id = ((pid << 24) | (typeId << 16) | idx) >>> 0;
+            if (!map.has(id)) map.set(id, []);
+            map.get(id).push({ lang, density, dt, data });
+          };
+          if (flags & 0x1) { for (let i = 0; i < n; i++) add(u16(dv, c + h + i * 4), u16(dv, c + h + i * 4 + 2) * 4); }
+          else if (flags & 0x2) { for (let i = 0; i < n; i++) { const o = u16(dv, c + h + i * 2); if (o !== 0xffff) add(i, o * 4); } }
+          else { for (let i = 0; i < n; i++) { const o = u32(dv, c + h + i * 4); if (o !== 0xffffffff) add(i, o); } }
+        }
+        c += s;
+      }
+    }
+    return { map, global };
+  }
+
+  function resolveString(arsc, id, depth = 0) {
+    const list = arsc && arsc.map.get(id);
+    if (!list || depth > 4) return null;
+    const pick = list.find(v => v.lang === 0) || list[0];
+    if (pick.dt === 0x03) return arsc.global.get(pick.data);
+    if (pick.dt === 0x01) return resolveString(arsc, pick.data, depth + 1);
+    return null;
+  }
+
+  // Returns { paths:[...], color:int|null } for a drawable/mipmap/color id.
+  function resolveDrawable(arsc, id, depth = 0) {
+    const out = { paths: [], color: null };
+    const list = arsc && arsc.map.get(id);
+    if (!list || depth > 4) return out;
+    for (const v of list) {
+      if (v.dt === 0x03) out.paths.push({ path: arsc.global.get(v.data), density: v.density });
+      else if (v.dt === 0x01) { const r = resolveDrawable(arsc, v.data, depth + 1); out.paths.push(...r.paths); if (r.color != null) out.color = r.color; }
+      else if (v.dt >= 0x1c && v.dt <= 0x1f) out.color = v.data;
+    }
+    return out;
+  }
+
+  const RASTER = /\.(png|webp|jpe?g)$/i;
+  function bestRaster(paths) {
+    const score = d => (d === 0xffff || d === 0xfffe) ? 1 : (d || 160);
+    return paths.filter(p => p.path && RASTER.test(p.path)).sort((a, b) => score(b.density) - score(a.density))[0]?.path || null;
+  }
+
+  async function findIcon(zip, arsc, iconRef) {
+    if (iconRef && iconRef.ref != null) {
+      const r = resolveDrawable(arsc, iconRef.ref);
+      const raster = bestRaster(r.paths);
+      if (raster) return { fg: raster };
+      const xml = r.paths.find(p => p.path && p.path.endsWith(".xml"));
+      if (xml) {
+        try {
+          const data = await readEntry(zip, xml.path);
+          const els = data ? parseAxml(data) : [];
+          const fgEl = els.find(e => e.name === "foreground"), bgEl = els.find(e => e.name === "background");
+          const fgRef = fgEl && fgEl.attrs.drawable, bgRef = bgEl && bgEl.attrs.drawable;
+          const fg = fgRef && fgRef.ref != null ? bestRaster(resolveDrawable(arsc, fgRef.ref).paths) : null;
+          let bg = null, bgColor = null;
+          if (bgRef && bgRef.ref != null) { const b = resolveDrawable(arsc, bgRef.ref); bg = bestRaster(b.paths); bgColor = b.color; }
+          else if (bgRef && bgRef.color != null) bgColor = bgRef.color;
+          if (fg) return { fg, bg, bgColor, adaptive: true };
+        } catch (_) { /* fall through */ }
+      }
+    }
+    // Fallback: biggest launcher-looking image in the APK.
+    let best = null;
+    for (const e of zip.entries.values()) {
+      if (/ic_launcher[^/]*\.(png|webp)$/i.test(e.name) && !/round/i.test(e.name) && (!best || e.usize > best.usize)) best = e;
+    }
+    return best ? { fg: best.name } : null;
+  }
+
+  /* DER / X.509 */
+  function der(u8, p) {
+    const tag = u8[p]; let len = u8[p + 1], hl = 2;
+    if (len & 0x80) { const n = len & 0x7f; len = 0; for (let i = 0; i < n; i++) len = len * 256 + u8[p + 2 + i]; hl = 2 + n; }
+    return { tag, start: p, cs: p + hl, end: p + hl + len };
+  }
+  function kids(u8, node) { const out = []; let p = node.cs; while (p < node.end) { const c = der(u8, p); out.push(c); p = c.end; } return out; }
+  function oid(u8, n) {
+    const b = u8.subarray(n.cs, n.end); const parts = [Math.floor(b[0] / 40), b[0] % 40]; let v = 0;
+    for (let i = 1; i < b.length; i++) { v = v * 128 + (b[i] & 0x7f); if (!(b[i] & 0x80)) { parts.push(v); v = 0; } }
+    return parts.join(".");
+  }
+  function derString(u8, n) {
+    const b = u8.subarray(n.cs, n.end);
+    if (n.tag === 0x1e) { let s = ""; for (let i = 0; i + 1 < b.length; i += 2) s += String.fromCharCode((b[i] << 8) | b[i + 1]); return s; }
+    return new TextDecoder().decode(b);
+  }
+  const DN = { "2.5.4.3": "CN", "2.5.4.6": "C", "2.5.4.7": "L", "2.5.4.8": "ST", "2.5.4.10": "O", "2.5.4.11": "OU" };
+  function certSummary(cert) {
+    try {
+      const tbs = kids(cert, der(cert, 0))[0];
+      const t = kids(cert, tbs); const i = t[0].tag === 0xa0 ? 1 : 0;
+      const validity = kids(cert, t[i + 3]).map(n => derString(cert, n));
+      const subject = kids(cert, t[i + 4]).map(set => {
+        const [o, v] = kids(cert, kids(cert, set)[0]);
+        return (DN[oid(cert, o)] || oid(cert, o)) + "=" + derString(cert, v);
+      }).reverse().join(", ");
+      const fmt = s => { const y = s.length === 13 ? (+s.slice(0, 2) < 50 ? "20" : "19") + s.slice(0, 2) : s.slice(0, 4); const r = s.length === 13 ? s.slice(2) : s.slice(4); return `${y}-${r.slice(0, 2)}-${r.slice(2, 4)}`; };
+      return { subject, validFrom: fmt(validity[0]), validTo: fmt(validity[1]) };
+    } catch (e) { return { subject: "(unreadable certificate)" }; }
+  }
+  function certsFromPkcs7(u8) {
+    const root = kids(u8, der(u8, 0));
+    const sd = kids(u8, root[1])[0];
+    const certsNode = kids(u8, sd).find(n => n.tag === 0xa0);
+    return certsNode ? kids(u8, certsNode).map(c => u8.slice(c.start, c.end)) : [];
+  }
+
+  /* APK Signature Scheme v2/v3 block */
+  function sigBlockCerts(zip) {
+    const { u8, dv, cdOffset } = zip, result = {};
+    if (cdOffset < 32) return result;
+    const magic = new TextDecoder().decode(u8.subarray(cdOffset - 16, cdOffset));
+    if (magic !== "APK Sig Block 42") return result;
+    const size = Number(dv.getBigUint64(cdOffset - 24, true));
+    let p = cdOffset - size; // first pair, after the leading size field
+    const end = cdOffset - 24;
+    const IDS = { 0x7109871a: "v2", 0xf05368c0: "v3", 0x1b93ad61: "v3.1" };
+    while (p + 12 <= end) {
+      const len = Number(dv.getBigUint64(p, true)), id = u32(dv, p + 8);
+      if (IDS[id]) {
+        try {
+          let q = p + 12;
+          q += 4;                  // signers sequence length
+          q += 4;                  // first signer length
+          q += 4;                  // signed data length
+          q += 4 + u32(dv, q);     // skip digests
+          const certsLen = u32(dv, q); q += 4;
+          const certsEnd = q + certsLen, certs = [];
+          while (q < certsEnd) { const cl = u32(dv, q); q += 4; certs.push(u8.slice(q, q + cl)); q += cl; }
+          result[IDS[id]] = certs;
+        } catch (_) { result[IDS[id]] = []; }
+      }
+      p += 8 + len;
+    }
+    return result;
+  }
+
+  /* SHA-256 with WebCrypto, pure-JS fallback for insecure contexts */
+  function sha256js(data) {
+    const K = new Uint32Array([0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]);
+    const H = new Uint32Array([0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]);
+    const l = data.length, padLen = ((l + 9 + 63) >> 6) << 6, m = new Uint8Array(padLen);
+    m.set(data); m[l] = 0x80;
+    const bits = l * 8, mv = new DataView(m.buffer);
+    mv.setUint32(padLen - 8, Math.floor(bits / 0x100000000)); mv.setUint32(padLen - 4, bits >>> 0);
+    const W = new Uint32Array(64), r = (x, n) => (x >>> n) | (x << (32 - n));
+    for (let o = 0; o < padLen; o += 64) {
+      for (let i = 0; i < 16; i++) W[i] = mv.getUint32(o + i * 4);
+      for (let i = 16; i < 64; i++) {
+        const s0 = r(W[i-15],7) ^ r(W[i-15],18) ^ (W[i-15] >>> 3), s1 = r(W[i-2],17) ^ r(W[i-2],19) ^ (W[i-2] >>> 10);
+        W[i] = (W[i-16] + s0 + W[i-7] + s1) | 0;
+      }
+      let [a,b,c,d,e,f,g,h] = H;
+      for (let i = 0; i < 64; i++) {
+        const t1 = (h + (r(e,6) ^ r(e,11) ^ r(e,25)) + ((e & f) ^ (~e & g)) + K[i] + W[i]) | 0;
+        const t2 = ((r(a,2) ^ r(a,13) ^ r(a,22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      H[0]+=a; H[1]+=b; H[2]+=c; H[3]+=d; H[4]+=e; H[5]+=f; H[6]+=g; H[7]+=h;
+    }
+    const out = new Uint8Array(32), ov = new DataView(out.buffer);
+    H.forEach((v, i) => ov.setUint32(i * 4, v));
+    return out;
+  }
+  async function sha256(data) {
+    if (globalThis.crypto && crypto.subtle) {
+      try { return new Uint8Array(await crypto.subtle.digest("SHA-256", data)); } catch (_) {}
+    }
+    return sha256js(data);
+  }
+  const hex = b => Array.from(b, x => x.toString(16).padStart(2, "0").toUpperCase()).join(":");
+
+  const DANGEROUS = new Set(("READ_CALENDAR WRITE_CALENDAR CAMERA READ_CONTACTS WRITE_CONTACTS GET_ACCOUNTS ACCESS_FINE_LOCATION " +
+    "ACCESS_COARSE_LOCATION ACCESS_BACKGROUND_LOCATION RECORD_AUDIO READ_PHONE_STATE READ_PHONE_NUMBERS CALL_PHONE ANSWER_PHONE_CALLS " +
+    "READ_CALL_LOG WRITE_CALL_LOG ADD_VOICEMAIL USE_SIP PROCESS_OUTGOING_CALLS BODY_SENSORS BODY_SENSORS_BACKGROUND SEND_SMS RECEIVE_SMS " +
+    "READ_SMS RECEIVE_WAP_PUSH RECEIVE_MMS READ_EXTERNAL_STORAGE WRITE_EXTERNAL_STORAGE ACCESS_MEDIA_LOCATION ACTIVITY_RECOGNITION " +
+    "READ_MEDIA_IMAGES READ_MEDIA_VIDEO READ_MEDIA_AUDIO READ_MEDIA_VISUAL_USER_SELECTED POST_NOTIFICATIONS NEARBY_WIFI_DEVICES " +
+    "BLUETOOTH_SCAN BLUETOOTH_CONNECT BLUETOOTH_ADVERTISE UWB_RANGING").split(" ").map(s => "android.permission." + s));
+
+  async function inspect(u8, fileName, log = () => {}) {
+    if (/\.(apks|xapk|apkm|aab)$/i.test(fileName)) throw new Error(fileName + " is a split bundle or app bundle. Only single .apk files are supported.");
+    const zip = readZip(u8);
+    log("ZIP has " + zip.entries.size + " entries");
+    const manifestBytes = await readEntry(zip, "AndroidManifest.xml");
+    if (!manifestBytes) throw new Error("No AndroidManifest.xml found. This is a ZIP, not an APK.");
+    const els = parseAxml(manifestBytes);
+    const m = els.find(e => e.name === "manifest");
+    if (!m) throw new Error("AndroidManifest.xml has no <manifest> element.");
+    const sdk = els.find(e => e.name === "uses-sdk") || { attrs: {} };
+    const app = els.find(e => e.name === "application") || { attrs: {} };
+    const permissions = [...new Set(els.filter(e => e.name === "uses-permission" || e.name === "uses-permission-sdk-23").map(e => e.attrs.name).filter(Boolean))]
+      .sort().map(name => ({ name, sensitive: DANGEROUS.has(name) }));
+
+    let arsc = null;
+    try { const a = await readEntry(zip, "resources.arsc"); if (a) arsc = parseArsc(a); }
+    catch (e) { log("Could not read resources.arsc: " + e.message, true); }
+
+    let label = typeof app.attrs.label === "string" ? app.attrs.label : null;
+    if (!label && app.attrs.label && app.attrs.label.ref != null) label = resolveString(arsc, app.attrs.label.ref);
+    const asStr = v => v == null ? null : (typeof v === "object" ? (v.ref != null ? resolveString(arsc, v.ref) : null) : String(v));
+
+    let icon = null;
+    try {
+      const ic = await findIcon(zip, arsc, app.attrs.icon);
+      if (ic) {
+        icon = { adaptive: !!ic.adaptive, bgColor: ic.bgColor ?? null };
+        icon.fg = await readEntry(zip, ic.fg);
+        icon.fgName = ic.fg;
+        if (ic.bg) icon.bg = await readEntry(zip, ic.bg);
+      } else log("No raster launcher icon found", true);
+    } catch (e) { log("Icon lookup failed: " + e.message, true); }
+
+    const signing = sigBlockCerts(zip);
+    const schemes = Object.keys(signing);
+    let certs = signing["v3.1"] || signing.v3 || signing.v2 || [];
+    const v1Name = [...zip.entries.keys()].find(n => /^META-INF\/[^/]+\.(RSA|DSA|EC)$/i.test(n));
+    if (v1Name) {
+      schemes.unshift("v1");
+      if (!certs.length) {
+        try { certs = certsFromPkcs7(await readEntry(zip, v1Name)); } catch (e) { log("v1 signature unreadable: " + e.message, true); }
+      }
+    }
+    const signers = [];
+    for (const c of certs) {
+      const s = certSummary(c);
+      signers.push({ ...s, sha256: hex(await sha256(c)), isDebugKey: /CN=Android Debug/i.test(s.subject) });
+    }
+    if (!signers.length) log("No signing certificate found", true);
+
+    const vc = m.attrs.versionCode;
+    return {
+      fileName, sizeBytes: u8.length,
+      packageName: m.attrs.package || "(unknown)",
+      versionName: asStr(m.attrs.versionName),
+      versionCode: typeof vc === "number" ? vc : (vc != null ? Number(vc) : null),
+      minSdk: sdk.attrs.minSdkVersion ?? null, targetSdk: sdk.attrs.targetSdkVersion ?? null,
+      label: label || m.attrs.package, icon, permissions, signers, schemes,
+      fileSha256: hex(await sha256(u8)),
+    };
+  }
+
+  return { inspect, sha256js, hex };
+})();
+if (typeof module !== "undefined") module.exports = APK;
+</script>
+
+<script>
+/* ---------- UI ---------- */
+const $ = id => document.getElementById(id);
+const logLines = [];
+function stamp() { return new Date().toISOString().replace("T", " ").slice(0, 19); }
+function log(msg, isErr = false) {
+  logLines.push(`${stamp()} ${isErr ? "ERROR" : "INFO "} ${msg}`);
+  renderLog();
+}
+function renderLog() {
+  const el = $("log");
+  el.innerHTML = "";
+  if (!logLines.length) { el.textContent = "Nothing logged yet."; return; }
+  [...logLines].reverse().forEach(l => {
+    const d = document.createElement("div");
+    d.textContent = l;
+    if (l.includes(" ERROR ")) d.className = "e";
+    el.appendChild(d);
+  });
+}
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch (_) {
+    const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta);
+    ta.select(); const ok = document.execCommand("copy"); ta.remove(); return ok;
+  }
+}
+function flash(btn, txt = "Copied") { const o = btn.textContent; btn.textContent = txt; setTimeout(() => btn.textContent = o, 1200); }
+
+function field(label, value, { mono = false, copy = false } = {}) {
+  const f = document.createElement("div"); f.className = "field";
+  const l = document.createElement("div"); l.className = "lbl";
+  const s = document.createElement("span"); s.textContent = label; l.appendChild(s);
+  if (copy) {
+    const b = document.createElement("button"); b.className = "small"; b.textContent = "Copy";
+    b.onclick = async () => { if (await copyText(value)) flash(b); };
+    l.appendChild(b);
+  }
+  const v = document.createElement("div"); v.textContent = value; if (mono) v.className = "mono";
+  f.append(l, v); return f;
+}
+
+async function drawIcon(icon) {
+  const box = $("icon"); box.textContent = "APK";
+  if (!icon || !icon.fg) return;
+  const toImg = bytes => new Promise((res, rej) => {
+    const url = URL.createObjectURL(new Blob([bytes])); const im = new Image();
+    im.onload = () => { res(im); URL.revokeObjectURL(url); }; im.onerror = rej; im.src = url;
+  });
+  try {
+    const cv = document.createElement("canvas"); cv.width = cv.height = 192;
+    const g = cv.getContext("2d");
+    if (icon.adaptive) {
+      // Adaptive icons: layers are 108dp with a 72dp visible area, so crop the centre.
+      if (icon.bgColor != null) {
+        const c = icon.bgColor >>> 0;
+        g.fillStyle = `rgba(${(c >> 16) & 255},${(c >> 8) & 255},${c & 255},${((c >>> 24) & 255) / 255 || 1})`;
+        g.fillRect(0, 0, 192, 192);
+      } else if (icon.bg) { const b = await toImg(icon.bg); g.drawImage(b, -48, -48, 288, 288); }
+      else { g.fillStyle = "#ffffff"; g.fillRect(0, 0, 192, 192); }
+      const f = await toImg(icon.fg); g.drawImage(f, -48, -48, 288, 288);
+    } else {
+      const f = await toImg(icon.fg); g.drawImage(f, 0, 0, 192, 192);
+    }
+    box.textContent = ""; box.appendChild(cv);
+  } catch (e) { log("Icon could not be drawn (" + (icon.fgName || "?") + ")", true); }
+}
+
+function render(info) {
+  $("label").textContent = info.label;
+  $("pkg").textContent = info.packageName;
+  $("ver").textContent = `Version ${info.versionName ?? "?"} (${info.versionCode ?? "?"})`;
+  drawIcon(info.icon);
+
+  const d = $("details"); d.innerHTML = "";
+  d.append(
+    field("File", info.fileName),
+    field("Size", (info.sizeBytes / 1048576).toFixed(2) + " MB"),
+    field("Min / target SDK", `${info.minSdk ?? "?"} / ${info.targetSdk ?? "?"}`),
+    field("Signature schemes", info.schemes.length ? info.schemes.join(", ") : "none found"),
+    field("File SHA-256", info.fileSha256, { mono: true, copy: true }),
+  );
+
+  const s = $("signing"); s.innerHTML = "";
+  if (!info.signers.length) {
+    const p = document.createElement("p"); p.className = "err";
+    p.textContent = "No signing certificate found. Android will refuse to install this APK.";
+    s.appendChild(p);
+  }
+  info.signers.forEach((sg, i) => {
+    if (i) s.appendChild(document.createElement("hr"));
+    s.append(field("Subject", sg.subject));
+    if (sg.validFrom) s.append(field("Valid", `${sg.validFrom} → ${sg.validTo}`));
+    s.append(field("Cert SHA-256", sg.sha256, { mono: true, copy: true }));
+    if (sg.isDebugKey) { const w = document.createElement("div"); w.className = "warn"; w.textContent = "Debug key: fine for testing, not for release."; s.appendChild(w); }
+  });
+
+  const sens = info.permissions.filter(p => p.sensitive).length;
+  $("permTitle").textContent = `Permissions (${info.permissions.length}, ${sens} sensitive)`;
+  const pe = $("perms"); pe.innerHTML = "";
+  if (!info.permissions.length) pe.textContent = "No permissions requested.";
+  info.permissions.forEach(p => {
+    const r = document.createElement("div"); r.className = "perm";
+    const n = document.createElement("span"); n.className = "mono"; n.textContent = p.name.replace(/^android\.permission\./, "");
+    r.appendChild(n);
+    if (p.sensitive) { const t = document.createElement("span"); t.className = "sens"; t.textContent = "sensitive"; r.appendChild(t); }
+    pe.appendChild(r);
+  });
+
+  $("pick").classList.add("hidden");
+  $("preview").classList.remove("hidden");
+}
+
+async function openFile(file) {
+  $("pickMsg").textContent = "";
+  log("Picked " + file.name);
+  try {
+    const u8 = new Uint8Array(await file.arrayBuffer());
+    const info = await APK.inspect(u8, file.name, log);
+    log(`Parsed ${info.packageName} ${info.versionName ?? ""} (${info.versionCode ?? "?"})`);
+    render(info);
+  } catch (e) {
+    log("Could not read " + file.name + " | " + e.message, true);
+    $("pickMsg").textContent = e.message;
+    showPick();
+  }
+}
+function showPick() { $("preview").classList.add("hidden"); $("pick").classList.remove("hidden"); }
+
+const SAMPLE = {
+  fileName: "packflow-studio-debug.apk", sizeBytes: 8_412_337,
+  packageName: "com.aistudio.packflow.xkrv", versionName: "1.3.0-debug", versionCode: 13,
+  minSdk: 26, targetSdk: 35, label: "PackFlow Studio", icon: null, schemes: ["v2", "v3"],
+  fileSha256: "3B:9A:1C:44:E0:7F:52:9D:AA:10:6E:C2:4B:88:F1:0D:2C:97:5E:61:B3:0A:DF:47:19:8C:E2:5A:73:04:BE:96",
+  signers: [{ subject: "C=US, O=Android, CN=Android Debug", validFrom: "2026-10-01", validTo: "2056-09-24",
+    sha256: "A1:7C:03:9E:55:D2:6B:F8:21:4A:90:CE:3F:17:B6:08:E4:5D:72:AC:19:63:FB:2E:8D:41:C0:5A:96:37:EB:12", isDebugKey: true }],
+  permissions: [
+    { name: "android.permission.INTERNET", sensitive: false },
+    { name: "android.permission.POST_NOTIFICATIONS", sensitive: true },
+    { name: "android.permission.REQUEST_INSTALL_PACKAGES", sensitive: false },
+  ],
+};
+
+$("chooseBtn").onclick = () => $("file").click();
+$("anotherBtn").onclick = () => { showPick(); $("file").click(); };
+$("file").onchange = e => { const f = e.target.files[0]; if (f) openFile(f); e.target.value = ""; };
+$("sampleBtn").onclick = () => { log("Showing sample data"); render(SAMPLE); };
+const showLog = () => { $("logView").classList.remove("hidden"); $("logView").scrollIntoView({ behavior: "smooth" }); };
+$("logBtn1").onclick = showLog; $("logBtn2").onclick = showLog;
+$("closeLog").onclick = () => $("logView").classList.add("hidden");
+$("clearLog").onclick = () => { logLines.length = 0; renderLog(); };
+$("copyLog").onclick = async e => { if (await copyText(logLines.join("\n"))) flash(e.target); };
+const drop = $("pick");
+["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) openFile(f); });
+if (typeof DecompressionStream === "undefined") log("This browser lacks DecompressionStream; use a current Chrome, Edge, Firefox or Safari.", true);
+renderLog();
+</script>
+</body>
+</html>

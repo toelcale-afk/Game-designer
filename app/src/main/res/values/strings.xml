@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">PackFlow Studio</string>
+    <string name="nav_install_apk">Install APK</string>
+    <string name="nav_claude_studio">Claude to APK</string>
+    <string name="nav_bundler">Bundler</string>
+    <string name="nav_inspector">Inspector</string>
+    <string name="nav_error_log">Error Log</string>
+    <string name="hero_title">PackFlow Studio</string>
+    <string name="hero_subtitle">APK verifier &amp; install preview, Claude artifact-to-APK converter, ZIP bundler, and line-accurate error logger.</string>
+    <string name="claude_header_title">Claude Artifact to APK Converter</string>
+    <string name="claude_header_subtitle">Import or paste HTML, React JSX/TSX, CSS, or Kotlin files written by Claude. Preview them inside an interactive Android device frame and package them into an APK project.</string>
+    <string name="bundle_name_label">Archive Package Name</string>
+    <string name="add_text_entry">New File</string>
+    <string name="pick_device_file">Import File</string>
+    <string name="pick_photo_media">Add Media</string>
+    <string name="build_zip_package">Package into .ZIP Archive</string>
+    <string name="share_package">Share Package</string>
+    <string name="save_to_device">Export to Storage</string>
+    <string name="empty_staging_title">Staging Area Empty</string>
+    <string name="empty_staging_tip">Add source files, photos, or convert a Claude artifact to package into a single archive.</string>
+    <string name="blueprint_header">Android App Package Generator</string>
+    <string name="blueprint_subtitle">Configure an Android project specification and inject all Gradle, Manifest, and Kotlin files into your staging bundle.</string>
+    <string name="inspector_header">Runtime Package Telemetry</string>
+    <string name="inspector_subtitle">Live inspection of this Android APK container, signing configuration, and device environment.</string>
+</resources>

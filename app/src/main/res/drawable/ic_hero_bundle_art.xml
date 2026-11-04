@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="160dp"
+    android:height="120dp"
+    android:viewportWidth="160"
+    android:viewportHeight="120">
+    <!-- Outer isometric glow rings -->
+    <path
+        android:fillColor="#1A10B981"
+        android:pathData="M80,10L140,44v48L80,116L20,92V44L80,10z" />
+    <!-- Top diamond lid -->
+    <path
+        android:fillColor="#FF10B981"
+        android:pathData="M80,22L126,48L80,74L34,48L80,22z" />
+    <!-- Left isometric face -->
+    <path
+        android:fillColor="#FF0D9488"
+        android:pathData="M34,52L78,77v31L34,83V52z" />
+    <!-- Right isometric face -->
+    <path
+        android:fillColor="#FF0284C7"
+        android:pathData="M82,77L126,52v31L82,108V77z" />
+    <!-- Floating inner module layer -->
+    <path
+        android:fillColor="#FF38BDF8"
+        android:pathData="M80,34L106,48L80,62L54,48L80,34z" />
+    <!-- Accent circuit nodes -->
+    <path
+        android:fillColor="#FFF8FAFC"
+        android:pathData="M80,44L88,48L80,52L72,48L80,44z" />
+</vector>
