@@ -105,6 +105,7 @@ fun PackFlowApp(
     LaunchedEffect(Unit) {
         viewModel.refreshRuntimeTelemetry(context)
         viewModel.gitHub.load(context)
+        viewModel.iconMaker.load(java.io.File(context.filesDir, "icon_maker"))
     }
 
     BackHandler(

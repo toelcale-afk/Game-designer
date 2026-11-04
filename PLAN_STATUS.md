@@ -7,7 +7,7 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
 | 0 Baseline | ✅ | Export imported, dead code removed, CI workflow added |
 | 1 Pipeline tabs | ✅ | Preview → Icon → Compile & Check → Install, then Bundler/Inspector/Error Log |
 | 2 Error catcher | ✅ | JS + Android catcher injected into every generated APK; standalone copy in reusable/error-catcher |
-| 3 Icon maker | ⏭ | |
+| 3 Icon maker | ✅ | Crop/zoom/background, 5 shape previews, all densities + adaptive icon |
 | 4 Offline quick build | ⏭ | |
 | 5 Home + Projects | ⏭ | |
 | 6 Asset Generator | ⏭ | |
@@ -74,6 +74,24 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
 - README with drop-in steps for any HTML or Android app.
 - Tests: `ErrorCatcherTest` (embedded copies match the reusable files, injection position,
   idempotence, package rewrite), manifest tests.
+
+## Phase 3: Icon maker
+
+**Done**
+- Step **2 Icon**: pick an image from the phone (photo picker) or from the current project
+  (list of project images, wired up in Phase 5). Drag to move, pinch or slider to zoom, reset.
+- Background: 8 preset colors, hex field, or a background image (cover-fit).
+- Live preview in the selected shape plus small previews of circle, squircle, rounded,
+  square and teardrop launchers.
+- "Generate" renders: `mipmap-{m,h,xh,xxh,xxxh}dpi/ic_launcher.png` (rounded square) and
+  `ic_launcher_round.png` (48 dp), adaptive `ic_launcher_foreground.png` /
+  `ic_launcher_background.png` (108 dp, image inside the 72 dp safe area),
+  `mipmap-anydpi-v26/ic_launcher(_round).xml`, and a 512 px `icon/ic_launcher-playstore.png`.
+  All go into the generated project and the manifest gets `android:icon`/`roundIcon`.
+- The design (`icon.json`) and source images are saved, so it survives restarts.
+- Tests: `IconSpecTest` (sizes, fit math, safe zone, colors, PNG header, JSON round trip);
+  `IconRendererTest` (Robolectric native graphics: every file has the right size, round icon
+  corners are transparent) runs on CI only.
 
 **Build environment note:** the cloud session I worked in can't reach Google's Maven repo, so
 I couldn't run the Android build locally. Every phase was compiled and tested by the GitHub

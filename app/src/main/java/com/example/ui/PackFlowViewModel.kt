@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.ClaudeApkConverter
 import com.example.data.GitHubBuildController
+import com.example.data.IconMakerController
 import com.example.data.ClaudePresetTemplate
 import com.example.data.PackagerEngine
 import com.example.model.BuiltArchive
@@ -79,6 +80,9 @@ class PackFlowViewModel : ViewModel() {
 
     /** Step 3 GitHub Actions build (push, watch, download APK). */
     val gitHub = GitHubBuildController(viewModelScope)
+
+    /** Step 2 icon maker. */
+    val iconMaker = IconMakerController(viewModelScope)
 
     init {
         val defaultPreset = ClaudeApkConverter.presets.first()
@@ -246,11 +250,18 @@ class PackFlowViewModel : ViewModel() {
         _uiState.update { it.copy(isLivePreviewFullScreen = fullScreen) }
     }
 
+    private fun projectEntries(state: PackFlowUiState): List<StagedEntry> =
+        ClaudeApkConverter.generateApkProjectEntries(
+            config = state.claudeConfig,
+            claudeFiles = state.claudeExtractedFiles,
+            iconPngs = iconMaker.projectPngs(),
+            iconXml = iconMaker.xmlFiles()
+        )
+
     /** The full generated Android project as (path, bytes), used by the GitHub build. */
     fun generatedProjectFiles(): List<Pair<String, ByteArray>> {
         val state = _uiState.value
-        return ClaudeApkConverter.generateApkProjectEntries(state.claudeConfig, state.claudeExtractedFiles)
-            .map { it.relativePath to it.bytes }
+        return projectEntries(state).map { it.relativePath to it.bytes }
     }
 
     fun pushAndBuildOnGitHub(context: Context) {
@@ -260,10 +271,7 @@ class PackFlowViewModel : ViewModel() {
     fun packageClaudeFilesIntoApkZip(context: Context) {
         try {
             val state = _uiState.value
-            val entries = ClaudeApkConverter.generateApkProjectEntries(
-                config = state.claudeConfig,
-                claudeFiles = state.claudeExtractedFiles
-            )
+            val entries = projectEntries(state)
             val slug = state.claudeConfig.appName.lowercase(Locale.US)
                 .replace(Regex("[^a-z0-9]+"), "_")
                 .trim('_')
