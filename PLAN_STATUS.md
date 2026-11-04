@@ -13,6 +13,7 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
 | 6 Asset Generator | ✅ | Imperium suite as Sprites/Tiles (blue drift fixed), Levels, sfxr Sound, Lyria Music, Gemini + Android Voice |
 | 7 Game Designer | ✅ | Units, campaign/missions, menus/HUD, sound hookups, saves; JSON in code/data/ |
 | 8 Engine + templates | ✅ | HTML5 canvas engine + grid-tactics template (2 missions), real-time hook |
+| + Sound library & voice changer | ✅ | 464 built-in sounds; record or pick a clip, 17 voice presets |
 
 ## Phase 0: Baseline
 
@@ -251,6 +252,32 @@ Tabs: **Sprites, Tiles, Levels, Sound, Music, Voice**. Everything saves into the
   reload + Continue from slot 1. No page errors. `TacticsTemplateTest`: engine copies match,
   the design validates against its own files, every file the game loads is shipped,
   levels sane.
+
+## Extra: sound library + voice changer (after the 8 phases)
+
+Asset Generator now has 8 tabs: Sprites, Tiles, Levels, Sound, **Library**, Music, Voice, **Voice FX**.
+
+- **Library**: a built-in database of 464 retro sounds in 8 categories (Weapons, Explosions,
+  Impacts, UI, Pickups, Movement, Creatures, Sci-fi). They're sfxr recipes with fixed seeds
+  (`core/SoundLibrary.kt`), made on the phone when played, so the APK doesn't grow and they're
+  free to use. Search by name/tag, filter by category, ★ favorites (saved on the phone),
+  play, **Add** to the project's `sounds/`, "Add all" favorites, or **Tweak** to open one in
+  the Sound tab's sliders.
+- **Voice FX** (voice changer, offline): **Record** with the mic (permission asked on first
+  tap; level meter; trims silence; up to 60 s), pick any clip in voice/, sounds/ or music/, or
+  import a file (WAV directly; MP3/M4A/OGG decoded with MediaCodec). 17 presets (Deep, Giant,
+  Monster, Demon, Gruff warrior, Armored helmet vox, Radio, Robot, Machine servant, Alien,
+  Chipmunk, Ghost, Cathedral, Canyon echo, Slow motion, Reverse) plus sliders for pitch
+  (keeps timing), speed, robot (ring mod + tone), radio/vox, distortion, bitcrush, wobble,
+  echo, reverb, demon double and reverse. Preview, then save to `voice/` as WAV.
+- DSP is pure Kotlin (`core/VoiceFx.kt`): two-head crossfaded pitch shifter, resampler,
+  RBJ biquads, ring mod, Schroeder reverb, echo, normalization; plus a WAV reader for
+  8/16/24/32-bit and float files.
+- Tests: `SoundLibraryTest` (≥400 unique sounds, every one audible and 0.01-6 s long,
+  deterministic, search), `VoiceFxTest` (±12 semitones lands within tolerance of the right
+  pitch and keeps length, speed changes length, every preset is clean and normalized,
+  reverb/echo tails, WAV formats).
+- New permission: `RECORD_AUDIO` (only used when you tap Record).
 
 ## How this was verified
 

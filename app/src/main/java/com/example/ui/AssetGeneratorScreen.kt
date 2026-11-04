@@ -59,7 +59,7 @@ import com.example.data.GeminiSettings
 import com.example.data.ProjectRepository
 import java.io.File
 
-private val ASSET_TABS = listOf("Sprites", "Tiles", "Levels", "Sound", "Music", "Voice")
+private val ASSET_TABS = listOf("Sprites", "Tiles", "Levels", "Sound", "Library", "Music", "Voice", "Voice FX")
 
 /** Asset Generator: Sprites, Tiles (the Imperium suite), Levels, Sound, Music, Voice. */
 @Composable
@@ -69,6 +69,8 @@ fun AssetGeneratorScreen(project: File?, onOpenProjects: () -> Unit, onBack: () 
     var showKey by remember { mutableStateOf(false) }
     var keyVersion by remember { mutableIntStateOf(0) }
     val repo = remember { ProjectRepository(context) }
+    // "Tweak" in the Library opens that sound in the Sound tab.
+    var soundToEdit by remember { mutableStateOf<Pair<com.example.core.SfxParams, String>?>(null) }
 
     Column(Modifier.fillMaxSize().testTag("asset_generator_screen")) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -97,9 +99,11 @@ fun AssetGeneratorScreen(project: File?, onOpenProjects: () -> Unit, onBack: () 
             when (tab) {
                 0, 1 -> SuiteWebView(project = project, suiteTab = if (tab == 0) "gen" else "tiles", keyVersion = keyVersion)
                 2 -> LevelEditorScreen(project)
-                3 -> SoundScreen(project)
-                4 -> MusicScreen(project, onNeedKey = { showKey = true })
-                else -> VoiceScreen(project, onNeedKey = { showKey = true })
+                3 -> SoundScreen(project, incoming = soundToEdit)
+                4 -> SoundLibraryScreen(project, onEdit = { params, name -> soundToEdit = params to name; tab = 3 })
+                5 -> MusicScreen(project, onNeedKey = { showKey = true })
+                6 -> VoiceScreen(project, onNeedKey = { showKey = true })
+                else -> VoiceFxScreen(project)
             }
         }
     }

@@ -39,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -114,7 +115,7 @@ private fun AudioFileList(dir: File, refresh: Int, title: String) {
 // ---------------------------------------------------------------- Sound
 
 @Composable
-fun SoundScreen(project: File) {
+fun SoundScreen(project: File, incoming: Pair<SfxParams, String>? = null) {
     val context = LocalContext.current
     val repo = remember { ProjectRepository(context) }
     val scope = rememberCoroutineScope()
@@ -124,6 +125,9 @@ fun SoundScreen(project: File) {
     var refresh by remember { mutableIntStateOf(0) }
     var message by remember { mutableStateOf<String?>(null) }
     DisposableEffect(Unit) { onDispose { PcmPlayer.stop() } }
+    LaunchedEffect(incoming) {
+        incoming?.let { (p, n) -> params = p; name = n; message = "Loaded $n from the library" }
+    }
 
     fun play(p: SfxParams = params) {
         scope.launch {
