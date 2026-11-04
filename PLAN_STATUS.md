@@ -12,7 +12,7 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
 | 5 Home + Projects | ✅ | Home with 4 entries, project file browser, Send to PackFlow, builds saved per project |
 | 6 Asset Generator | ✅ | Imperium suite as Sprites/Tiles (blue drift fixed), Levels, sfxr Sound, Lyria Music, Gemini + Android Voice |
 | 7 Game Designer | ✅ | Units, campaign/missions, menus/HUD, sound hookups, saves; JSON in code/data/ |
-| 8 Engine + templates | ⏭ | |
+| 8 Engine + templates | ✅ | HTML5 canvas engine + grid-tactics template (2 missions), real-time hook |
 
 ## Phase 0: Baseline
 
@@ -217,6 +217,40 @@ Tabs: **Sprites, Tiles, Levels, Sound, Music, Voice**. Everything saves into the
 - The Levels editor's unit picker uses these unit IDs.
 - Tests: `GameDesignTest` (round trip through the files, `game-data.js` is valid JSON,
   chain order, validation finds each kind of problem, IDs).
+
+## Phase 8: 2D engine + templates
+
+**Done**
+- `engine/packflow-engine.js` (canonical copy; embedded into projects): canvas renderer with
+  DPR scaling, scenes (menu, settings, credits, briefing, battle, pause, result), canvas
+  buttons, tap/drag input (drag pans big maps), sound hookups (effects + looping menu/battle
+  music, unlocked on first tap), image cache for sprites/tiles/backgrounds, save slots +
+  autosave + Continue (localStorage), campaign flow (next mission on victory, retry on
+  defeat). Loads `data/*.json` and `levels/*.json` with `fetch`, falling back to
+  `window.GAME_DATA` from `data/game-data.js`.
+- `engine/tactics.js` registers the `turnbased` mode: tap a unit → movement range (terrain
+  costs, impassable tiles, blocking objects, enemies block, allies pass through) and targets
+  in range; move with animation; attack (attack − defense − tile cover ± 1, minimum 1);
+  floating damage; HP bars; End turn → enemy AI (attacks the weakest target in range,
+  otherwise advances to the best cell toward the nearest foe, then attacks); win/lose from
+  the mission (destroy all, survive N turns, reach tile, kill unit type / all lost, turn
+  limit, unit lost). Teams with spawn points but no placed units get their faction's units.
+  Units draw their sprite if set, otherwise a faction-colored token.
+- **Real-time hook:** missions carry `"mode"` (default `turnbased`); modes are registered with
+  `PF.registerMode(name, factory)` and get the same engine/battle objects. A placeholder
+  `realtime` mode shows a "not built yet" banner.
+- **Template "Grid tactics (turn-based)"** in Projects → New project: Space Marines vs Orks
+  (Landfall: destroy all) then vs Tyranids pouring from spawn points (Hold the Gate: survive
+  6 turns), units/menus/saves preset in the Game Designer files, 8 sound effects generated
+  with the sfxr port and hooked up, README. It's a normal project, so it plays in step 1
+  Preview and builds with the quick build and the GitHub build.
+- `tools/gen_kotlin_assets.py` regenerates the embedded copies of the engine and error
+  catcher; tests fail if they drift.
+- Verified in headless Chromium: menu → briefing → battle → select/move → enemy turn (AI
+  moved, turn 2, autosave) → victory → mission 2 with 8 spawned Tyranids → defeat →
+  reload + Continue from slot 1. No page errors. `TacticsTemplateTest`: engine copies match,
+  the design validates against its own files, every file the game loads is shipped,
+  levels sane.
 
 **Build environment note:** the cloud session I worked in can't reach Google's Maven repo, so
 I couldn't run the Android build locally. Every phase was compiled and tested by the GitHub

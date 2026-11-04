@@ -39,7 +39,9 @@ data class Mission(
     val winValue: String = "",      // turns, "x,y" or unit id
     val lose: LoseCondition = LoseCondition.ALL_UNITS_LOST,
     val loseValue: String = "",
-    val next: String? = null        // id of the mission that follows on victory
+    val next: String? = null,       // id of the mission that follows on victory
+    /** Engine mode that plays this mission ("turnbased"; "realtime" is the hook for later). */
+    val mode: String = "turnbased"
 )
 
 data class Campaign(val name: String = "Campaign", val start: String? = null, val missions: List<Mission> = emptyList()) {
@@ -178,7 +180,8 @@ data class GameDesign(
                     "playerFaction" to it.playerFaction, "enemyFaction" to it.enemyFaction,
                     "win" to linkedMapOf("type" to it.win.name, "value" to it.winValue),
                     "lose" to linkedMapOf("type" to it.lose.name, "value" to it.loseValue),
-                    "next" to it.next
+                    "next" to it.next,
+                    "mode" to it.mode
                 )
             }
         ),
@@ -284,7 +287,8 @@ data class GameDesign(
                                     winValue = it.obj("win")?.str("value").orEmpty(),
                                     lose = runCatching { LoseCondition.valueOf(it.obj("lose")?.str("type").orEmpty()) }.getOrDefault(LoseCondition.ALL_UNITS_LOST),
                                     loseValue = it.obj("lose")?.str("value").orEmpty(),
-                                    next = it["next"] as? String
+                                    next = it["next"] as? String,
+                                    mode = it.str("mode", "turnbased").ifBlank { "turnbased" }
                                 )
                             }
                         )

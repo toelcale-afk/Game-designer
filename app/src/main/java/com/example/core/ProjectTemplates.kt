@@ -21,13 +21,7 @@ object ProjectTemplates {
         )
     }
 
-    private val registered = mutableListOf(BLANK)
+    val all: List<ProjectTemplate> by lazy { listOf(BLANK, TacticsTemplate.TEMPLATE) }
 
-    val all: List<ProjectTemplate> get() = registered
-
-    fun register(t: ProjectTemplate) {
-        if (registered.none { it.id == t.id }) registered.add(t)
-    }
-
-    fun byId(id: String): ProjectTemplate = registered.firstOrNull { it.id == id } ?: BLANK
+    fun byId(id: String): ProjectTemplate = all.firstOrNull { it.id == id } ?: BLANK
 }
