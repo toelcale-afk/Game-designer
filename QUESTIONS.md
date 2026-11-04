@@ -54,3 +54,36 @@ Each item lists the decision I needed, the default I used, and how to change it.
    `claude/packflow-studio-android-5318tj`. I attached a git bundle of the branch so nothing is
    lost; see the final message. To give write access, install the Claude GitHub App with
    write permission on the repo.
+
+## Phase 4
+
+9. **Package rename approach (you asked me to document it):** I rewrite the compiled binary
+   `AndroidManifest.xml` directly. The package, label and version name are strings in its
+   string pool; `core/Axml.kt` decodes the whole pool, replaces the placeholder strings and
+   re-encodes it (fixing the chunk and file sizes), so new names can be any length.
+   Attribute references are indices, which don't change. `versionCode` is patched in place.
+   Strings that start with the placeholder package plus a dot are renamed too, in case a
+   future shell declares package-based permissions. The shell has no content providers or
+   androidx libraries, so no other file contains the package name.
+   **Default used:** this approach; it's unit-tested and the CI test checks the real shell
+   with `aapt2 dump badging`.
+
+10. **Shell language:** the shell is Java with framework APIs only (no androidx, no Kotlin
+    runtime) so the template APK is tiny and has nothing package-specific baked in.
+    **Default used:** Java for the shell only; PackFlow itself stays Kotlin/Compose.
+
+11. **Signature schemes:** quick-built APKs are signed with v2 + v3 (minSdk 24 doesn't need
+    v1, and apksig's v1 signer uses `java.util.Base64`, which is missing on Android 7).
+    **Default used:** v2 + v3.
+
+12. **apksig version:** `com.android.tools.build:apksig:8.7.3` (added to
+    `gradle/libs.versions.toml`; it's the only new library). I couldn't check Google Maven
+    from this session; if CI can't resolve it, bump to the version matching your AGP.
+
+13. **Signing key lifetime:** one key per phone, kept in PackFlow's private storage (encrypted
+    with the Android Keystore). If PackFlow is uninstalled or its data cleared, a new key is
+    made, and older quick-built apps must be uninstalled before the new build installs.
+    **Default used:** no export/import of the key yet. Tell me if you want a backup option.
+
+14. **React (JSX) artifacts** still load React/Babel from unpkg.com, so they need internet at
+    run time even when built offline. Plain HTML/JS games run fully offline.

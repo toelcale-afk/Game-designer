@@ -8,7 +8,7 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
 | 1 Pipeline tabs | ✅ | Preview → Icon → Compile & Check → Install, then Bundler/Inspector/Error Log |
 | 2 Error catcher | ✅ | JS + Android catcher injected into every generated APK; standalone copy in reusable/error-catcher |
 | 3 Icon maker | ✅ | Crop/zoom/background, 5 shape previews, all densities + adaptive icon |
-| 4 Offline quick build | ⏭ | |
+| 4 Offline quick build | ✅ | Shell module + on-device manifest rewrite + apksig signing; verified on CI with aapt2/apksigner |
 | 5 Home + Projects | ⏭ | |
 | 6 Asset Generator | ⏭ | |
 | 7 Game Designer | ⏭ | |
@@ -92,6 +92,35 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
 - Tests: `IconSpecTest` (sizes, fit math, safe zone, colors, PNG header, JSON round trip);
   `IconRendererTest` (Robolectric native graphics: every file has the right size, round icon
   corners are transparent) runs on CI only.
+
+## Phase 4: Offline quick build
+
+**Done**
+- `shell/`: a framework-only WebView app (Java, ~no dependencies, R8-minified). It serves
+  `assets/www/` from `https://appassets.androidplatform.net/assets/...` (so `fetch`, modules
+  and `localStorage` work), reads `assets/packflow_shell.json` (full screen, orientation),
+  handles back (incl. Android 13+ back callback), and has the Phase 2 crash catcher + JS bridge.
+  Its manifest uses literal placeholders: package `com.packflow.shell.placeholder`, label
+  `PackFlowShellAppName`, version `0.0.0-packflow`. Icon is PNG-only.
+- CI builds `:shell:assembleRelease` (unsigned) and copies it to
+  `app/src/main/assets/shell/webshell.apk` before building PackFlow (git-ignored).
+- On the phone (Compile & Check → "Quick build (offline)", HTML/JS apps only):
+  1. copy the shell, 2. rewrite the binary manifest (`core/Axml.kt`: full string-pool
+  re-encode, so any name length works; package, label, versionName, versionCode),
+  3. drop the old signature, put the game into `assets/www/`, swap launcher PNGs by size,
+  4. write a zip-aligned APK (`core/ShellApk.kt`), 5. sign v2+v3 with apksig using this
+  phone's PackFlow key, then "Next: 4 Install".
+- Signing key: RSA 2048 generated on first use; self-signed cert built with a tiny DER encoder
+  (`core/SelfSignedCert.kt`); private key stored in `filesDir/quickbuild/` encrypted with an
+  Android Keystore AES key. The fingerprint is shown in the card.
+- Generated-project workflow artifact: `retention-days: 1` (done in Phase 1).
+- Tests: `AxmlTest` (UTF-8/UTF-16 pools, styles, long strings, versionCode), `ShellApkTest`
+  (manifest/web/icons/signature removal, 4-byte alignment verified by reading local headers,
+  validation, path traversal), `SelfSignedCertTest`. `QuickBuildShellTest` patches the real CI
+  shell, signs it and checks it with apksig's `ApkVerifier`; the workflow then runs
+  `aapt2 dump badging` and `apksigner verify` on the result.
+
+**Kotlin apps** still use the GitHub build (the quick build card only shows for HTML/JS/React).
 
 **Build environment note:** the cloud session I worked in can't reach Google's Maven repo, so
 I couldn't run the Android build locally. Every phase was compiled and tested by the GitHub

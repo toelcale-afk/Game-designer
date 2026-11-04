@@ -8,6 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.data.ClaudeApkConverter
 import com.example.data.GitHubBuildController
 import com.example.data.IconMakerController
+import com.example.data.QuickBuildController
+import com.example.core.QuickBuildSpec
 import com.example.data.ClaudePresetTemplate
 import com.example.data.PackagerEngine
 import com.example.model.BuiltArchive
@@ -83,6 +85,9 @@ class PackFlowViewModel : ViewModel() {
 
     /** Step 2 icon maker. */
     val iconMaker = IconMakerController(viewModelScope)
+
+    /** Step 3 offline quick build (HTML/JS apps). */
+    val quickBuild = QuickBuildController(viewModelScope)
 
     init {
         val defaultPreset = ClaudeApkConverter.presets.first()
@@ -262,6 +267,29 @@ class PackFlowViewModel : ViewModel() {
     fun generatedProjectFiles(): List<Pair<String, ByteArray>> {
         val state = _uiState.value
         return projectEntries(state).map { it.relativePath to it.bytes }
+    }
+
+    /** Web files for the quick build: the compiled single-page app (plus project assets later). */
+    fun quickBuildWebFiles(): Map<String, ByteArray> {
+        val state = _uiState.value
+        return mapOf("index.html" to ClaudeApkConverter.buildStandaloneWebApkHtml(state.claudeConfig, state.claudeExtractedFiles).toByteArray())
+    }
+
+    fun startQuickBuild(context: Context, packageName: String, versionName: String, versionCode: Int, fullscreen: Boolean, orientation: String) {
+        val config = _uiState.value.claudeConfig
+        quickBuild.build(
+            context,
+            QuickBuildSpec(
+                appName = config.appName,
+                packageName = packageName.trim(),
+                versionName = versionName.trim().ifBlank { "1.0" },
+                versionCode = versionCode,
+                webFiles = quickBuildWebFiles(),
+                icons = QuickBuildController.legacyIcons(iconMaker.projectPngs()),
+                fullscreen = fullscreen,
+                orientation = orientation
+            )
+        )
     }
 
     fun pushAndBuildOnGitHub(context: Context) {

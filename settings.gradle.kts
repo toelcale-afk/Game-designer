@@ -25,3 +25,5 @@ dependencyResolutionManagement {
 rootProject.name = "PackFlow Studio"
 
 include(":app")
+// Prebuilt WebView shell for the offline quick build (built by CI, see shell/build.gradle.kts).
+include(":shell")

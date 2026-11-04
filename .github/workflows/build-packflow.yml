@@ -55,8 +55,25 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
+      # Phase 4: the WebView shell for the offline quick build is built first and bundled
+      # into PackFlow's assets (never committed).
+      - name: Build quick-build shell
+        run: |
+          gradle --no-configuration-cache :shell:assembleRelease
+          mkdir -p app/src/main/assets/shell
+          cp "$(find shell/build/outputs/apk/release -name '*.apk' | head -1)" app/src/main/assets/shell/webshell.apk
+          ls -la app/src/main/assets/shell/
+
       - name: Unit tests
         run: gradle --no-configuration-cache testDebugUnitTest
+
+      - name: Check quick-build output with aapt2 and apksigner
+        run: |
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          "$BT/aapt2" dump badging app/build/quickbuild-test.apk | tee badging.txt | head -5
+          grep -q "package: name='com.packflow.citest' versionCode='25' versionName='2.5'" badging.txt
+          grep -q "application-label:'CI Test Game'" badging.txt
+          "$BT/apksigner" verify --verbose app/build/quickbuild-test.apk
 
       - name: Build debug APK
         run: gradle --no-configuration-cache assembleDebug
