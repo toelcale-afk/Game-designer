@@ -1,16 +1,13 @@
 package com.example.ui
 
-import android.app.Activity
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.ClaudeApkConverter
 import com.example.data.ClaudePresetTemplate
 import com.example.data.PackagerEngine
-import com.example.model.AndroidBlueprintSpec
 import com.example.model.BuiltArchive
 import com.example.model.CaughtErrorLogEntry
 import com.example.model.ClaudeApkConfig
@@ -18,11 +15,7 @@ import com.example.model.ClaudeDiagnosticIssue
 import com.example.model.ClaudeSourceFile
 import com.example.model.CompressionProfile
 import com.example.model.ConsoleLogMessage
-import com.example.model.InstallOutcomeType
-import com.example.model.InstallPreviewStage
-import com.example.model.InstallResultStatus
 import com.example.model.PackFlowTab
-import com.example.model.PickedApkInfo
 import com.example.model.RuntimeApkTelemetry
 import com.example.model.StagedEntry
 import com.example.model.StagedEntryCategory
@@ -32,7 +25,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,14 +34,6 @@ import kotlinx.coroutines.withContext
 
 data class PackFlowUiState(
     val activeTab: PackFlowTab = PackFlowTab.INSTALL_APK,
-    // Install APK & Preview APK state
-    val canInstallUnknownApps: Boolean = true,
-    val pickedApkInfo: PickedApkInfo? = null,
-    val isLoadingApkPreview: Boolean = false,
-    val apkPreviewError: String? = null,
-    val lastInstallResult: InstallResultStatus? = null,
-    val installPreviewStage: InstallPreviewStage = InstallPreviewStage.IDLE,
-    val isPreviewSimulating: Boolean = false,
     // Claude-to-APK & Live Device Preview state
     val claudeRawInput: String = "",
     val claudeConfig: ClaudeApkConfig = ClaudeApkConfig(),
@@ -67,8 +51,6 @@ data class PackFlowUiState(
     val stagedEntries: List<StagedEntry> = emptyList(),
     val builtArchives: List<BuiltArchive> = emptyList(),
     val latestBuiltArchive: BuiltArchive? = null,
-    val blueprintSpec: AndroidBlueprintSpec = AndroidBlueprintSpec(),
-    val blueprintPreviewTab: Int = 0,
     val runtimeTelemetry: RuntimeApkTelemetry? = null,
     val isPackaging: Boolean = false,
     val statusBannerMessage: String? = null,
@@ -108,26 +90,13 @@ class PackFlowViewModel : ViewModel() {
                 claudeExtractedFiles = parsedFiles,
                 claudeDiagnostics = diagnostics,
                 stagedEntries = initialEntries,
-                statusBannerMessage = "Ready: Pick an .apk file (ACTION_OPEN_DOCUMENT) or load a built-in Test APK."
+                statusBannerMessage = "Ready: paste or import code in Preview, then work through the pipeline."
             )
         }
     }
 
     fun selectTab(tab: PackFlowTab) {
         _uiState.update { it.copy(activeTab = tab) }
-    }
-
-    fun refreshUnknownAppsPermissionState(context: Context) {
-        try {
-            val allowed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.packageManager.canRequestPackageInstalls()
-            } else {
-                true
-            }
-            _uiState.update { it.copy(canInstallUnknownApps = allowed) }
-        } catch (e: Throwable) {
-            recordException(e, "Check canRequestPackageInstalls")
-        }
     }
 
     fun recordException(throwable: Throwable, contextHint: String) {
@@ -138,321 +107,6 @@ class PackFlowViewModel : ViewModel() {
                 statusBannerMessage = "Caught ${entry.errorType} at ${entry.fileName}:${entry.lineNumber} — logged to Error Log"
             )
         }
-    }
-
-    // ========================================================================
-    // 1. INSTALL APK & PREVIEW APK SCREEN
-    // ========================================================================
-
-    fun pickApkFromUri(context: Context, uri: Uri) {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isLoadingApkPreview = true,
-                    apkPreviewError = null,
-                    lastInstallResult = null,
-                    pickedApkInfo = null
-                )
-            }
-            try {
-                val info = withContext(Dispatchers.IO) {
-                    val resolver = context.contentResolver
-                    var displayName = "selected_package.apk"
-                    resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
-                        if (cursor.moveToFirst()) {
-                            val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                            if (idx >= 0) {
-                                val name = cursor.getString(idx)
-                                if (!name.isNullOrBlank()) displayName = name
-                            }
-                        }
-                    }
-
-                    val bundlesDir = File(context.cacheDir, "bundles")
-                    if (!bundlesDir.exists()) bundlesDir.mkdirs()
-                    val tempFile = File(bundlesDir, "picked_${System.currentTimeMillis()}_${displayName.replace(Regex("[^a-zA-Z0-9._-]"), "_")}")
-
-                    resolver.openInputStream(uri)?.use { input ->
-                        tempFile.outputStream().use { output ->
-                            input.copyTo(output)
-                        }
-                    } ?: throw IllegalArgumentException("Could not open input stream for selected URI: $uri")
-
-                    try {
-                        PackagerEngine.inspectApkFile(context, tempFile, displayName)
-                    } catch (inspectErr: Throwable) {
-                        // Clean up invalid copied file immediately
-                        runCatching { tempFile.delete() }
-                        throw inspectErr
-                    }
-                }
-
-                _uiState.update {
-                    it.copy(
-                        isLoadingApkPreview = false,
-                        pickedApkInfo = info,
-                        apkPreviewError = null,
-                        installPreviewStage = InstallPreviewStage.VERIFYING_PACKAGE,
-                        statusBannerMessage = "Verified real APK: ${info.appName} (${info.packageName})"
-                    )
-                }
-            } catch (e: Throwable) {
-                _uiState.update {
-                    it.copy(
-                        isLoadingApkPreview = false,
-                        pickedApkInfo = null,
-                        apkPreviewError = "${e::class.java.simpleName}: ${e.localizedMessage ?: "Invalid APK file"}"
-                    )
-                }
-                recordException(e, "Verify & Preview Picked APK")
-            }
-        }
-    }
-
-    /**
-     * Stages one of the built-in Test APKs so the user can test:
-     * 1) Standard external package APK (`com.claude.pulsesample`)
-     * 2) Self-matching package warning (`com.aistudio.packflow.xkrv`)
-     * 3) Incompatible higher minSdk (`API 37 > Build.VERSION.SDK_INT`)
-     * 4) Invalid non-APK ZIP missing `AndroidManifest.xml`
-     */
-    fun loadBuiltInTestApk(
-        context: Context,
-        scenario: String
-    ) {
-        viewModelScope.launch {
-            _uiState.update {
-                it.copy(
-                    isLoadingApkPreview = true,
-                    apkPreviewError = null,
-                    lastInstallResult = null,
-                    pickedApkInfo = null
-                )
-            }
-            try {
-                val info = withContext(Dispatchers.IO) {
-                    when (scenario) {
-                        "external_valid" -> {
-                            val fileName = "claude_pulse_sample.apk"
-                            val staged = PackagerEngine.stageSampleInstalledApk(context, fileName)
-                            PackagerEngine.inspectApkFile(
-                                context = context,
-                                apkFile = staged,
-                                displayFileName = fileName,
-                                overridePackageNameForTest = "com.claude.pulsesample"
-                            )
-                        }
-                        "self_match" -> {
-                            val fileName = "packflow_self_update_test.apk"
-                            val staged = PackagerEngine.stageSampleInstalledApk(context, fileName)
-                            PackagerEngine.inspectApkFile(
-                                context = context,
-                                apkFile = staged,
-                                displayFileName = fileName
-                            )
-                        }
-                        "high_min_sdk" -> {
-                            val fileName = "future_xr_api37_test.apk"
-                            val staged = PackagerEngine.stageSampleInstalledApk(context, fileName)
-                            PackagerEngine.inspectApkFile(
-                                context = context,
-                                apkFile = staged,
-                                displayFileName = fileName,
-                                overrideMinSdkForTest = Build.VERSION.SDK_INT + 2,
-                                overridePackageNameForTest = "com.claude.futurexr"
-                            )
-                        }
-                        else -> {
-                            val badZip = PackagerEngine.stageInvalidNonApkZipForTest(context)
-                            try {
-                                PackagerEngine.inspectApkFile(context, badZip, badZip.name)
-                            } finally {
-                                runCatching { badZip.delete() }
-                            }
-                        }
-                    }
-                }
-                _uiState.update {
-                    it.copy(
-                        isLoadingApkPreview = false,
-                        pickedApkInfo = info,
-                        apkPreviewError = null,
-                        installPreviewStage = InstallPreviewStage.VERIFYING_PACKAGE,
-                        statusBannerMessage = "Loaded test APK: ${info.fileName} (${info.packageName})"
-                    )
-                }
-            } catch (e: Throwable) {
-                _uiState.update {
-                    it.copy(
-                        isLoadingApkPreview = false,
-                        pickedApkInfo = null,
-                        apkPreviewError = "${e::class.java.simpleName}: ${e.localizedMessage}"
-                    )
-                }
-                recordException(e, "Test APK Verification ($scenario)")
-            }
-        }
-    }
-
-    /**
-     * Deletes the copied temporary APK file when the user taps Cancel or after installation completes.
-     */
-    fun cancelAndDeleteCopiedApk() {
-        val currentApk = _uiState.value.pickedApkInfo
-        val cachedFile = currentApk?.cachedFile
-        val deleted = if (cachedFile != null && cachedFile.exists()) {
-            runCatching { cachedFile.delete() }.getOrDefault(false)
-        } else {
-            true
-        }
-
-        _uiState.update {
-            it.copy(
-                pickedApkInfo = null,
-                apkPreviewError = null,
-                installPreviewStage = InstallPreviewStage.IDLE,
-                lastInstallResult = InstallResultStatus(
-                    outcome = InstallOutcomeType.CANCELLED,
-                    statusCode = Activity.RESULT_CANCELED,
-                    title = "Installation Cancelled (Status Code: 0 / RESULT_CANCELED)",
-                    details = "Cancelled APK preview for '${currentApk?.fileName ?: "package.apk"}'. Temporary copied APK file deleted from cache ($deleted).",
-                    tempFileDeleted = deleted
-                ),
-                statusBannerMessage = "Cancelled preview & deleted temporary copied APK file."
-            )
-        }
-    }
-
-    fun onSystemInstallerActivityResult(resultCode: Int, dataIntentMessage: String?) {
-        val currentApk = _uiState.value.pickedApkInfo
-        val cachedFile = currentApk?.cachedFile
-        val deleted = if (cachedFile != null && cachedFile.exists()) {
-            runCatching { cachedFile.delete() }.getOrDefault(false)
-        } else {
-            true
-        }
-
-        val resultStatus = when (resultCode) {
-            Activity.RESULT_OK -> InstallResultStatus(
-                outcome = InstallOutcomeType.SUCCESS,
-                statusCode = 0, // PackageInstaller.STATUS_SUCCESS
-                title = "Install Succeeded (Status Code: 0 / STATUS_SUCCESS)",
-                details = "System installer completed installation for '${currentApk?.packageName ?: "package"}'. Temporary copied APK deleted from cache.",
-                tempFileDeleted = deleted
-            )
-            Activity.RESULT_CANCELED -> InstallResultStatus(
-                outcome = InstallOutcomeType.CANCELLED,
-                statusCode = 3, // PackageInstaller.STATUS_FAILURE_ABORTED
-                title = "Install Cancelled (Status Code: 3 / STATUS_FAILURE_ABORTED)",
-                details = "The system installer prompt was cancelled or closed (${dataIntentMessage ?: "RESULT_CANCELED"}). Temporary copied APK deleted from cache.",
-                tempFileDeleted = deleted
-            )
-            else -> InstallResultStatus(
-                outcome = InstallOutcomeType.FAILED,
-                statusCode = resultCode,
-                title = "Install Failed (Status Code: $resultCode)",
-                details = "System package installer returned failure code $resultCode (${dataIntentMessage ?: "INSTALL_FAILED"}). Temporary copied APK deleted from cache.",
-                tempFileDeleted = deleted
-            )
-        }
-
-        _uiState.update {
-            it.copy(
-                pickedApkInfo = it.pickedApkInfo?.copy(cachedFile = null),
-                installPreviewStage = InstallPreviewStage.COMPLETED,
-                lastInstallResult = resultStatus,
-                statusBannerMessage = "${resultStatus.title} — Temp APK cleaned up."
-            )
-        }
-    }
-
-    fun simulatePreviewInstallOutcome(outcome: InstallOutcomeType, statusCode: Int) {
-        val currentApk = _uiState.value.pickedApkInfo
-        val cachedFile = currentApk?.cachedFile
-        val deleted = if (cachedFile != null && cachedFile.exists()) {
-            runCatching { cachedFile.delete() }.getOrDefault(false)
-        } else {
-            true
-        }
-
-        val status = when (outcome) {
-            InstallOutcomeType.SUCCESS -> InstallResultStatus(
-                outcome = InstallOutcomeType.SUCCESS,
-                statusCode = statusCode,
-                title = "Preview Install Succeeded (Status Code: $statusCode / STATUS_SUCCESS)",
-                details = "Simulated system installer completion for '${currentApk?.packageName ?: "com.claude.pulsesample"}'. Temporary copied APK deleted from cache.",
-                tempFileDeleted = deleted
-            )
-            InstallOutcomeType.CANCELLED -> InstallResultStatus(
-                outcome = InstallOutcomeType.CANCELLED,
-                statusCode = statusCode,
-                title = "Preview Install Cancelled (Status Code: $statusCode / STATUS_FAILURE_ABORTED)",
-                details = "User cancelled the system installer confirmation dialog. Temporary copied APK deleted from cache.",
-                tempFileDeleted = deleted
-            )
-            InstallOutcomeType.FAILED -> InstallResultStatus(
-                outcome = InstallOutcomeType.FAILED,
-                statusCode = statusCode,
-                title = "Preview Install Failed (Status Code: $statusCode / STATUS_FAILURE_INVALID)",
-                details = "Package installer reported failure code $statusCode. Temporary copied APK deleted from cache.",
-                tempFileDeleted = deleted
-            )
-        }
-
-        _uiState.update {
-            it.copy(
-                pickedApkInfo = it.pickedApkInfo?.copy(cachedFile = null),
-                installPreviewStage = InstallPreviewStage.COMPLETED,
-                lastInstallResult = status,
-                statusBannerMessage = status.title
-            )
-        }
-    }
-
-    fun runInstallFlowPreview() {
-        val currentApk = _uiState.value.pickedApkInfo
-        if (currentApk == null) {
-            try {
-                throw IllegalStateException("No .apk file loaded. Pick an .apk file or tap a Test APK button before running the preview.")
-            } catch (e: Throwable) {
-                recordException(e, "Start Install Flow Preview")
-            }
-            return
-        }
-        if (!currentApk.isMinSdkCompatible) {
-            try {
-                throw IllegalStateException("Cannot install '${currentApk.packageName}': APK requires minimum SDK ${currentApk.minSdk}, but this phone runs SDK ${currentApk.hostDeviceSdk}.")
-            } catch (e: Throwable) {
-                recordException(e, "Minimum Android Version Check")
-            }
-            return
-        }
-        if (_uiState.value.isPreviewSimulating) return
-
-        viewModelScope.launch {
-            try {
-                _uiState.update {
-                    it.copy(
-                        isPreviewSimulating = true,
-                        installPreviewStage = InstallPreviewStage.VERIFYING_PACKAGE
-                    )
-                }
-                delay(400)
-                _uiState.update { it.copy(installPreviewStage = InstallPreviewStage.SYSTEM_PROMPT) }
-                delay(550)
-                _uiState.update { it.copy(installPreviewStage = InstallPreviewStage.INSTALLING_PROGRESS) }
-                delay(550)
-                simulatePreviewInstallOutcome(InstallOutcomeType.SUCCESS, 0)
-                _uiState.update { it.copy(isPreviewSimulating = false) }
-            } catch (e: Throwable) {
-                _uiState.update { it.copy(isPreviewSimulating = false) }
-                recordException(e, "Install Flow Preview")
-            }
-        }
-    }
-
-    fun setInstallPreviewStage(stage: InstallPreviewStage) {
-        _uiState.update { it.copy(installPreviewStage = stage) }
     }
 
     // ========================================================================

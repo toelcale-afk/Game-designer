@@ -18,8 +18,6 @@
     <string name="save_to_device">Export to Storage</string>
     <string name="empty_staging_title">Staging Area Empty</string>
     <string name="empty_staging_tip">Add source files, photos, or convert a Claude artifact to package into a single archive.</string>
-    <string name="blueprint_header">Android App Package Generator</string>
-    <string name="blueprint_subtitle">Configure an Android project specification and inject all Gradle, Manifest, and Kotlin files into your staging bundle.</string>
     <string name="inspector_header">Runtime Package Telemetry</string>
     <string name="inspector_subtitle">Live inspection of this Android APK container, signing configuration, and device environment.</string>
 </resources>

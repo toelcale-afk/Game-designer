@@ -16,3 +16,8 @@
 local.properties
 .env
 debug.keystore
+
+# The shared debug keystore is committed on purpose (see QUESTIONS.md)
+!keystore/debug.keystore
+# Shell APK is built by CI and copied into assets; never commit it
+app/src/main/assets/shell/

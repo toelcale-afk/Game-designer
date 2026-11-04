@@ -2,10 +2,7 @@ package com.example
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -54,7 +51,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -68,9 +64,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.aistudio.packflow.xkrv.installer.ErrorLog
@@ -115,28 +108,11 @@ fun PackFlowApp(
     viewModel: PackFlowViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var pendingExportArchive by remember { mutableStateOf<BuiltArchive?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.refreshRuntimeTelemetry(context)
-        viewModel.refreshUnknownAppsPermissionState(context)
-        // Load the built-in valid sample APK on startup so the Preview APK screen is immediately ready to test
-        viewModel.loadBuiltInTestApk(context, "external_valid")
-    }
-
-    // Re-check canRequestPackageInstalls() whenever returning from Settings
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshUnknownAppsPermissionState(context)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
     }
 
     BackHandler(
@@ -151,33 +127,6 @@ fun PackFlowApp(
             uiState.isLivePreviewFullScreen -> viewModel.toggleLivePreviewFullScreen(false)
             uiState.activeTab != PackFlowTab.INSTALL_APK -> viewModel.selectTab(PackFlowTab.INSTALL_APK)
         }
-    }
-
-    // 1. System File Picker for .apk using ACTION_OPEN_DOCUMENT (ActivityResultContracts.OpenDocument)
-    val apkOpenDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        if (uri != null) {
-            viewModel.pickApkFromUri(context, uri)
-        }
-    }
-
-    // 2. Unknown Apps Settings Launcher (ACTION_MANAGE_UNKNOWN_APP_SOURCES)
-    val unknownAppsSettingsLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) {
-        viewModel.refreshUnknownAppsPermissionState(context)
-    }
-
-    // 3. System Package Installer Launcher (ACTION_INSTALL_PACKAGE with EXTRA_RETURN_RESULT)
-    val systemPackageInstallerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { activityResult ->
-        val extraStatus = activityResult.data?.getIntExtra("android.intent.extra.INSTALL_RESULT", activityResult.resultCode)
-        viewModel.onSystemInstallerActivityResult(
-            resultCode = activityResult.resultCode,
-            dataIntentMessage = extraStatus?.let { "INSTALL_RESULT=$it" }
-        )
     }
 
     // 4. Claude source file picker

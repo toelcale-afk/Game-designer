@@ -1,0 +1,77 @@
+name: Build PackFlow Studio
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-packflow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # The debug keystore is created once and committed to keystore/ so every
+      # build (CI and local) signs with the same key and installs update in place.
+      - name: Create shared debug keystore (first run only)
+        run: |
+          if [ ! -f keystore/debug.keystore ]; then
+            mkdir -p keystore
+            keytool -genkeypair -v \
+              -keystore keystore/debug.keystore \
+              -storepass android -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -f keystore/debug.keystore
+            git commit -m "Add shared debug keystore (created by CI)"
+            if ! git push origin "HEAD:${GITHUB_REF_NAME}"; then
+              # Another run committed one first: use that one instead.
+              git fetch origin "${GITHUB_REF_NAME}"
+              git checkout "origin/${GITHUB_REF_NAME}" -- keystore/debug.keystore || true
+            fi
+          fi
+          # app/build.gradle.kts reads ${rootDir}/debug.keystore (AI Studio config, left untouched).
+          cp keystore/debug.keystore debug.keystore
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Unit tests
+        run: gradle --no-configuration-cache testDebugUnitTest
+
+      - name: Build debug APK
+        run: gradle --no-configuration-cache assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: packflow-studio-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 3
+
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: app/build/reports/tests/
+          retention-days: 3
