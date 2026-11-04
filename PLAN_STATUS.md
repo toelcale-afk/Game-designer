@@ -11,7 +11,7 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
 | 4 Offline quick build | ✅ | Shell module + on-device manifest rewrite + apksig signing; verified on CI with aapt2/apksigner |
 | 5 Home + Projects | ✅ | Home with 4 entries, project file browser, Send to PackFlow, builds saved per project |
 | 6 Asset Generator | ✅ | Imperium suite as Sprites/Tiles (blue drift fixed), Levels, sfxr Sound, Lyria Music, Gemini + Android Voice |
-| 7 Game Designer | ⏭ | |
+| 7 Game Designer | ✅ | Units, campaign/missions, menus/HUD, sound hookups, saves; JSON in code/data/ |
 | 8 Engine + templates | ⏭ | |
 
 ## Phase 0: Baseline
@@ -191,6 +191,32 @@ Tabs: **Sprites, Tiles, Levels, Sound, Music, Voice**. Everything saves into the
 - Tests: `SfxrTest` (all presets audible and bounded, deterministic, footsteps short, JSON,
   WAV header), `LevelTest` (paint/fill/resize/units/spawns/JSON), `GeminiApiTest`
   (TTS body shape, PCM→WAV, MP3 + lyrics, errors, model IDs).
+
+## Phase 7: Game Designer
+
+**Done** (tabs: Units, Campaign, Menus & HUD, Sounds, Saves; Save button with unsaved marker)
+- **Units**: factions (name + color; Space Marines, Orks, Tyranids preset) and units with
+  name, ID, faction, sprite (picked from the project's sprites/tiles with a preview),
+  health, movement, attack, range, defense, cost.
+- **Campaign**: campaign name; missions with name, briefing text, level, player/enemy
+  faction, win condition (destroy all, survive N turns, reach tile x,y, kill a unit type),
+  lose condition (all units lost, turn limit, unit type lost) and the next mission. New
+  missions are linked to the end of the chain; deleting one relinks the chain; ▶ marks the
+  start mission.
+- **Menus & HUD**: title, subtitle, background image, accent color, Continue/Settings/Credits
+  buttons, credits text; HUD turn counter, unit panel, end-turn button, objective, top or
+  bottom, size.
+- **Sounds**: each game action (select, move, attack, hit, death, turn start, victory, defeat,
+  menu button, menu music, battle music) → a clip from sounds/, voice/ or music/, with play.
+- **Saves**: on/off, 1-10 slots, autosave each turn, storage key.
+- Saved as `code/data/units.json`, `campaign.json`, `ui.json`, `sounds.json`, `save.json`,
+  plus `game-data.js` (`window.GAME_DATA`, including the missions' levels) so the engine also
+  runs where `fetch()` of local files isn't allowed.
+- A "things to check" card lists validation problems (duplicate IDs, missing faction/sprite/
+  level files, bad win values, a mission chain that loops).
+- The Levels editor's unit picker uses these unit IDs.
+- Tests: `GameDesignTest` (round trip through the files, `game-data.js` is valid JSON,
+  chain order, validation finds each kind of problem, IDs).
 
 **Build environment note:** the cloud session I worked in can't reach Google's Maven repo, so
 I couldn't run the Android build locally. Every phase was compiled and tested by the GitHub

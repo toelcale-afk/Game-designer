@@ -79,6 +79,7 @@ import com.example.core.FileKind
 import com.example.core.ProjectLayout
 import com.example.data.ProjectRepository
 import com.example.ui.AssetGeneratorScreen
+import com.example.ui.GameDesignerScreen
 import com.example.ui.HomeScreen
 import com.example.ui.PreviewProject
 import com.example.ui.ProjectsScreen
@@ -155,16 +156,11 @@ fun StudioApp(viewModel: PackFlowViewModel = viewModel()) {
             onOpenProjects = { section = StudioSection.PROJECTS },
             onBack = goHome
         )
-        StudioSection.DESIGNER -> SectionPlaceholder("Game Designer", goHome)
-    }
-}
-
-@Composable
-private fun SectionPlaceholder(title: String, onBack: () -> Unit) {
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall)
-        Text("Coming in the next phase.")
-        Button(onClick = onBack) { Text("Home") }
+        StudioSection.DESIGNER -> GameDesignerScreen(
+            project = currentProject,
+            onOpenProjects = { section = StudioSection.PROJECTS },
+            onBack = goHome
+        )
     }
 }
 
