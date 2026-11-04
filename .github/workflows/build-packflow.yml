@@ -19,11 +19,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      # Robolectric needs Java 21 for its Android 16 (API 36) sandbox.
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       # The debug keystore is created once and committed to keystore/ so every
       # build (CI and local) signs with the same key and installs update in place.
