@@ -10,7 +10,7 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
 | 3 Icon maker | ✅ | Crop/zoom/background, 5 shape previews, all densities + adaptive icon |
 | 4 Offline quick build | ✅ | Shell module + on-device manifest rewrite + apksig signing; verified on CI with aapt2/apksigner |
 | 5 Home + Projects | ✅ | Home with 4 entries, project file browser, Send to PackFlow, builds saved per project |
-| 6 Asset Generator | ⏭ | |
+| 6 Asset Generator | ✅ | Imperium suite as Sprites/Tiles (blue drift fixed), Levels, sfxr Sound, Lyria Music, Gemini + Android Voice |
 | 7 Game Designer | ⏭ | |
 | 8 Engine + templates | ⏭ | |
 
@@ -150,6 +150,47 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
 - Tests: `ProjectLayoutTest` (web mapping both ways, unsafe paths, names, meta, templates),
   `ProjectRepositoryTest` (Robolectric, CI): folders, rename/move/delete, refusing paths
   outside projects, zip export without builds/.
+
+## Phase 6: Asset Generator
+
+Tabs: **Sprites, Tiles, Levels, Sound, Music, Voice**. Everything saves into the current project.
+
+**Done**
+- **Sprites / Tiles**: `imported/imperium/` exists, so the Imperium suite is used, renamed
+  "Asset Generator". `tools/build_asset_suite.py` builds
+  `app/src/main/assets/asset-suite/index.html` from the untouched original (re-run it after
+  updating the suite). It opens on the generation tab (Sprites) or the tile slicer (Tiles)
+  in one WebView, with file pickers working.
+  - Gemini key: read from/written to Android (Keystore-encrypted) through
+    `window.PackFlowKeys`; never stored in localStorage, never baked into a file ("Save key
+    into a copy" is hidden). Links to other sites open in the browser, not in the key page.
+  - Saves also write into the project: `sprites/<faction>/<subfaction>/<asset>/…`,
+    tile atlases to `tiles/<faction>/`, downloads to `sprites/downloads/`, zips to `builds/`.
+  - Image models updated (`gemini-3.1-flash-image` is deprecated): Nano Banana 2.1 /
+    Gemini 3 Pro Image, still editable.
+  - **Blue drift fix** (three causes, see the script header): (1) each sprite's neutral tint
+    (Lab a*/b* of low-chroma pixels) is pulled to the tone anchor's tint, or to the palette's
+    neutrals, so a slight blue cast can't compound from one generation to the next;
+    saturated colors (team colors, gold) aren't touched; checkbox "Neutral colors (fix blue
+    tint)", on by default. (2) Palette snap now weighs hue mismatch, so skin/warm colors stop
+    snapping to the steel-blue entries. (3) Tone match no longer clips single channels.
+    Verified in headless Chromium: a blue-tinted gray moves to the palette's tint, gold and
+    saturated blue stay exact, no page errors.
+- **Levels**: tile-grid builder. Tools Paint / Fill / Unit / Object / Spawn / Erase, drag to
+  paint, Move/zoom mode (pinch), teams (Player, Enemy, Neutral, Ally), unit picker reads
+  the Game Designer's `code/data/units.json`, tiles can use images from `tiles/`, resize.
+  Saved as `levels/<name>.json` (`format: packflow-level`).
+- **Sound**: offline sfxr-style generator (Kotlin port of the public-domain sfxr): Laser,
+  Explosion, Hit, Pickup, Footstep, Jump, Power-up, Blip, Random, plus Mutate and 14
+  sliders. Saved as 16-bit 44.1 kHz WAV in `sounds/` (settings kept in `sounds/.sfx/`).
+- **Music**: Lyria through `generateContent` with the user's key (MP3 + lyrics/structure
+  text saved to `music/`). Model ID editable (default `lyria-3-clip-preview`). Always offers
+  **Import a track made in the Gemini app**. See QUESTIONS.md #18 about the free tier.
+- **Voice**: Android's built-in offline TextToSpeech (voice, pitch, speed, preview, saved as
+  WAV) or Gemini TTS (voice, "how to say it", model ID, PCM wrapped as WAV). Saved in `voice/`.
+- Tests: `SfxrTest` (all presets audible and bounded, deterministic, footsteps short, JSON,
+  WAV header), `LevelTest` (paint/fill/resize/units/spawns/JSON), `GeminiApiTest`
+  (TTS body shape, PCM→WAV, MP3 + lyrics, errors, model IDs).
 
 **Build environment note:** the cloud session I worked in can't reach Google's Maven repo, so
 I couldn't run the Android build locally. Every phase was compiled and tested by the GitHub

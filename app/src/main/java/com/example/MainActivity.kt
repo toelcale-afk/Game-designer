@@ -78,6 +78,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import com.example.core.FileKind
 import com.example.core.ProjectLayout
 import com.example.data.ProjectRepository
+import com.example.ui.AssetGeneratorScreen
 import com.example.ui.HomeScreen
 import com.example.ui.PreviewProject
 import com.example.ui.ProjectsScreen
@@ -149,7 +150,11 @@ fun StudioApp(viewModel: PackFlowViewModel = viewModel()) {
             },
             onBack = goHome
         )
-        StudioSection.ASSETS -> SectionPlaceholder("Asset Generator", goHome)
+        StudioSection.ASSETS -> AssetGeneratorScreen(
+            project = currentProject,
+            onOpenProjects = { section = StudioSection.PROJECTS },
+            onBack = goHome
+        )
         StudioSection.DESIGNER -> SectionPlaceholder("Game Designer", goHome)
     }
 }

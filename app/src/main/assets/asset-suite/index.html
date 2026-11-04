@@ -1,0 +1,1477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Asset Generator</title>
+<style>
+:root{--bg:#101216;--panel:#161920;--gold:#f3c623;--blue:#1b3a60;--text:#f0f2f5;--line:#2c323f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:13px 'Courier New',monospace;display:flex;height:100vh;overflow:hidden}
+#side{width:230px;background:var(--panel);border-right:2px solid var(--gold);padding:14px;overflow-y:auto;flex-shrink:0}
+#side h2{font-size:15px;color:var(--gold);margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.nav{display:block;width:100%;background:none;color:var(--text);border:1px solid var(--line);padding:10px;margin-bottom:8px;text-align:left;font:inherit;font-weight:bold;cursor:pointer}
+.nav.on,.nav:hover{background:var(--blue);border-color:var(--gold);color:var(--gold)}
+details{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;color:var(--gold);margin-bottom:8px}
+main{flex:1;display:flex;flex-direction:column;min-width:0}
+header{background:var(--panel);border-bottom:2px solid var(--gold);padding:10px 18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;color:var(--gold);flex:1}
+#msg{font-size:12px;color:var(--text);min-height:30px;padding:7px 18px;background:#12233a;border-left:3px solid var(--gold);margin-top:10px;line-height:1.4}
+select{min-height:38px}
+.sw{display:flex;gap:4px;flex-wrap:wrap;margin:2px 0 12px}.sw span{width:28px;height:28px;border:1px solid var(--line)}
+.tab{display:none;flex:1;overflow-y:auto;padding:18px}
+.tab.on{display:block}
+.bible{margin:12px 18px 0;border:1px dashed var(--gold);background:rgba(27,58,96,.25);padding:8px 12px}
+.bible textarea{margin:6px 0 0}
+label{display:block;margin:0 0 4px;font-size:12px;color:var(--gold)}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--line);color:var(--text);padding:7px;margin-bottom:12px;font:inherit}
+input[type=checkbox]{width:auto;margin-right:6px}
+button.go{background:var(--gold);color:var(--bg);border:0;padding:9px 16px;font:inherit;font-weight:bold;cursor:pointer;margin:0 6px 8px 0}
+button.go:hover{background:#fff}button.go:disabled{opacity:.5}
+button.alt{background:none;color:var(--gold);border:1px solid var(--gold)}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>div{flex:1;min-width:110px}
+.stage{border:2px solid var(--line);background:repeating-conic-gradient(#1a1d24 0 25%,#12141a 0 50%) 0 0/16px 16px;min-height:160px;display:flex;align-items:center;justify-content:center;padding:10px;margin:8px 0;overflow:auto}
+canvas{image-rendering:pixelated;max-width:100%}
+.lib{display:flex;gap:8px;flex-wrap:wrap}
+.lib canvas{width:72px;height:72px;object-fit:contain;border:1px solid var(--line);background:#12141a;cursor:pointer}
+.lib canvas:hover{border-color:var(--gold)}
+#refPrev{max-height:70px;border:1px solid var(--line);margin-bottom:10px;image-rendering:pixelated}
+.note{font-size:11px;color:#8b95a7}
+.chat{max-height:240px;overflow-y:auto;border:1px solid var(--line);padding:6px;margin:6px 0;font-size:12px}
+.msgb{padding:4px 6px;margin-bottom:4px;white-space:pre-wrap}.msgb.you{color:var(--gold)}.msgb.sys{color:#8b95a7}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin:10px 0}
+.card{border:1px solid var(--line);background:#12141a;padding:6px;cursor:pointer;font-size:10px;text-align:center;overflow:hidden}
+.card img{width:100%;height:72px;object-fit:contain;image-rendering:pixelated}
+.card.sel{border-color:var(--gold)}
+.card .json{height:72px;display:flex;align-items:center;justify-content:center;color:var(--gold)}
+.card span{display:block;word-break:break-all;margin-top:4px}
+#msgWrap{position:sticky;top:0;z-index:30;background:var(--bg);margin-top:10px}
+#msgWrap #msg{margin-top:0}
+#msgWrap.busy #msg::before{content:"";display:inline-block;width:11px;height:11px;margin-right:8px;border:2px solid var(--gold);border-top-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-1px}
+#pbar{height:5px;background:var(--line);overflow:hidden}
+#pbar i{display:block;height:100%;background:var(--gold);transition:width .3s}
+#pbar i.ind{width:35%;animation:ind 1.1s ease-in-out infinite}
+@keyframes sp{to{transform:rotate(360deg)}}@keyframes ind{0%{margin-left:-35%}100%{margin-left:100%}}
+#fGrid details{margin:4px 0 4px 10px;border-top:0;padding-top:0}#fGrid summary{margin:0 0 4px}#fGrid input{margin-bottom:0}.card.ck{outline:2px solid var(--gold)}
+@media(max-width:700px){body{flex-direction:column;height:auto;overflow:auto}#side{width:100%}}
+
+:root{--bg:#0c0e12;--panel:#14181f;--line:#262d3a;--blue:#1d2c44;--text:#eef1f6;--mut:#8b95a7;--r:10px}
+body{font:14px/1.45 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+#side{background:linear-gradient(180deg,#171c26,#11141b);border-right:1px solid var(--line)}
+#side h2{letter-spacing:.14em;text-transform:uppercase;font-size:13px}
+.nav{border-radius:var(--r);border-color:transparent;background:#1a202b;font-weight:600;padding:12px}
+.nav.on,.nav:hover{background:#232b3a;border-color:var(--gold);box-shadow:inset 3px 0 0 var(--gold)}
+header{background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:15px;letter-spacing:.12em;text-transform:uppercase}
+.bible{border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:var(--r);background:#121722}
+label{letter-spacing:.05em;text-transform:uppercase;font-size:11px}
+input,select,textarea{border-radius:8px;background:#0f1217;border-color:var(--line);min-height:40px}
+input[type=checkbox]{min-height:0}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--gold)}
+button.go{border-radius:8px;padding:11px 16px}button.go:active{transform:translateY(1px)}
+button.alt{border-color:#4a4524;background:rgba(243,198,35,.06)}
+.stage,.chat,.card{border-radius:var(--r)}.card:hover{border-color:var(--gold)}
+.note{color:var(--mut)}summary{font-weight:600}
+#msg{border-radius:0 8px 8px 0;background:#161d2b}
+@media(max-width:700px){#side .nav{display:inline-block;width:calc(50% - 5px);margin-right:4px}}
+</style>
+</head>
+<body>
+
+<div id="side">
+  <h2>Asset Generator</h2>
+  <button class="nav on" data-tab="gen">1. Asset Generation</button>
+  <button class="nav" data-tab="anim">2. Animation Studio</button>
+  <button class="nav" data-tab="tiles">3. Map Tile Slicer</button>
+  <button class="nav" data-tab="files">4. Project Files</button>
+  <button class="nav" data-tab="iso">5. Photo Isolate</button>
+
+  <details open>
+    <summary>Gemini settings</summary>
+    <label>Gemini API key</label>
+    <input id="key" type="password" placeholder="From Google AI Studio" autocomplete="off">
+    <div class="note" id="keyState"></div>
+    <button class="go alt" id="bakeKey">Save key into a copy of this tool</button>
+    <label>Image model</label>
+    <select id="modelSel">
+      <option value="gemini-nano-banana-2.1">Nano Banana 2.1 (fast)</option>
+      <option value="gemini-3-pro-image">Gemini 3 Pro Image (best quality)</option>
+      <option value="gemini-3.1-flash-image">Gemini 3.1 Flash Image (deprecated)</option>
+      <option value="custom">Custom model ID…</option>
+    </select>
+    <input id="model" placeholder="Paste a model ID" hidden>
+    <p class="note">Your key stays in this browser only. Saved assets also live in this browser, so use the Project Files tab to export them to your phone.</p>
+  </details>
+</div>
+
+<main>
+  <header>
+    <h1 id="title">Asset Generation</h1>
+    <select id="proj" style="width:200px;margin:0"></select>
+    <button class="go alt" id="newProj" style="margin:0">New project</button>
+    <button class="go alt" id="delProj" style="margin:0">Delete project</button>
+  </header>
+
+  <details class="bible" open>
+    <summary>Style bible for this project (added to every generation)</summary>
+    <div class="row">
+      <div style="flex:3"><label>Style photo (also used as the style reference when generating)</label>
+        <input id="styleFile" type="file" accept="image/png,image/jpeg"></div>
+      <div><label>Palette colors</label>
+        <select id="ncol"><option>8</option><option>12</option><option>16</option><option>24</option><option selected>32</option><option>48</option><option>64</option></select></div>
+    </div>
+    <button class="go" id="mkPal">Palette from photo</button>
+    <button class="go" id="mkStyle">Style bible from photo</button>
+    <button class="go alt" id="undoStyle" hidden>Undo style bible</button>
+    <div class="sw" id="swatches"></div>
+    <textarea id="style" rows="3"></textarea>
+    <label>Palette snap (forces every pixel onto these colors)</label>
+    <select id="palSel">
+      <option value="">Off (keep the model's colors)</option>
+      <option value="#101216,#F3C623,#1B3A60,#8A93A6,#F0F2F5">Imperium: Void Black + Solar Yellow + steel</option>
+      <option value="#101216,#F3C623,#1B3A60,#2C323F,#8A93A6,#F0F2F5,#B8860B,#7A1E1E">Imperium extended (adds dark gold, red)</option>
+      <option value="#101216,#F3C623">Strict two-color</option>
+      <option value="custom">Custom hex list…</option>
+    </select>
+    <input id="pal" placeholder="#101216,#F3C623,#1B3A60" hidden>
+  </details>
+  <div class="bible">
+    <label>Save to: faction, subfaction, then asset name. The asset type follows the Asset type menu.</label>
+    <div class="row"><div><select id="dFac"></select></div><div><select id="dSub"></select></div><div><input id="dName" placeholder="Asset name (blank = from subject)" style="margin:0"></div></div>
+    <div class="note" id="dPath"></div>
+    <details><summary>Add or remove factions and subfactions</summary>
+      <input id="addName" placeholder="Name, for example Cultists or Plague Walkers">
+      <button class="go alt" id="addFac">Add faction</button>
+      <button class="go alt" id="addSub">Add subfaction to selected faction</button>
+      <button class="go alt" id="rmSub">Remove selected subfaction</button>
+      <button class="go alt" id="rmFac">Remove selected faction</button>
+      <p class="note">Every faction keeps a General subfaction. Subfactions and factions can only be removed when they hold no saved files.</p>
+    </details>
+  </div>
+  <div id="msgWrap"><div id="msg"></div><div id="pbar" hidden><i></i></div></div>
+
+  <!-- TAB 1 -->
+  <section class="tab on" id="tab-gen">
+    <div class="row">
+      <div><label>Asset type</label><select id="cat"><option>Character</option><option value="Chassis">Chassis (standard body, no weapons)</option><option>Infantry unit</option><option>Heavy armor unit</option><option>Building</option><option>Terrain</option><option>Foliage</option><option>Weapon or gear</option><option>Rocks</option><option>Prop</option><option>Icon</option></select></div>
+      <div><label>Camera</label>
+        <select id="view"><option>isometric 3/4 view, facing south-east</option><option>isometric 3/4 view, facing south-west</option><option>strict top-down view</option><option>flat side view</option></select></div>
+      <div><label>Pixel size (longest side)</label>
+        <select id="px"><option value="0">Off (raw)</option><option>32</option><option>48</option><option>64</option><option>96</option><option selected>128</option><option>192</option><option>256</option></select></div>
+    </div>
+    <label>Subject</label>
+    <textarea id="desc" rows="3" placeholder="Space Marine sergeant with plasma pistol and power sword, blue armor, gold trim"></textarea>
+    <label>Style reference image (optional; keeps variants consistent)</label>
+    <input id="refFile" type="file" accept="image/png,image/jpeg">
+    <img id="refPrev" hidden alt="Reference">
+    <button class="go" id="gen">Generate</button>
+    <button class="go alt" id="pixBtn">Pixelate photo (free, exact colors)</button>
+    <label style="display:inline-block;margin-left:6px">Background cutout strength</label>
+    <input id="tol" type="range" min="10" max="200" value="90" style="width:140px;display:inline-block;margin:0 0 0 8px">
+    <label style="display:inline-block;margin-left:10px">Color pop</label><input id="pop" type="range" min="0" max="100" value="25" style="width:120px;display:inline-block;margin:0 0 0 8px">
+    <label style="display:inline-block;margin-left:10px;color:var(--text)"><input type="checkbox" id="outline" checked>Outline</label>
+    <label style="display:inline-block;margin-left:10px;color:var(--text)"><input type="checkbox" id="wb" checked>Neutral colors (fix blue tint)</label>
+    <div class="stage"><canvas id="out" width="64" height="64"></canvas></div>
+    <button class="go" id="toLib">Save to project</button>
+    <button class="go alt" id="dlOut">Download PNG</button>
+    <button class="go alt" id="useRef">Use as style reference</button>
+        <button class="go alt" id="setAnchor">Set tone anchor</button>
+    <button class="go alt" id="lockPal">Lock faction palette from this</button>
+    <label style="display:block;margin:0 0 8px;color:var(--text)"><input type="checkbox" id="d8Step" checked>Add stepping poses so units walk with real leg movement (+2 images)</label>
+    <label style="display:block;margin:0 0 8px;color:var(--text)"><input type="checkbox" id="d8Atk" checked>Add a real attack pose (+1 image)</label>
+    <button class="go" id="d8Gen">Split into sprites: full sheet (1 to 4 images)</button>
+    <button class="go alt" id="d8Save" hidden>Save again</button>
+    <div class="stage" id="d8Stage" hidden><canvas id="d8cv" width="64" height="64"></canvas></div>
+    <div id="d8Ctl" hidden>
+      <div class="row"><div><label>Preview direction</label><select id="d8Dir"></select></div><div><label>Preview animation</label><select id="d8Anim"></select></div></div>
+      <div class="stage"><canvas id="d8Prev" width="64" height="64"></canvas></div>
+      <input id="godotPath" value="res://sprites/"><button class="go alt" id="godotBtn">Save Godot SpriteFrames (.tres)</button>
+      <button class="go alt" id="d8Spin">Spin 360: off</button><button class="go alt" id="d8Gif">Save turntable GIF</button>
+      <label>Spin speed</label><select id="d8Hold"><option value="6">Slow</option><option value="3" selected>Normal</option><option value="2">Fast</option><option value="1">Very fast</option></select>
+    </div>
+    <p class="note">Draws the current asset from five headings in one image (south, south-east, east, north-east, north), then mirrors three to get south-west, west and north-west. With stepping poses on it costs 3 images in total (1 for the headings, 2 for the left-foot and right-foot steps); turn the box off for 1 image. One tap does everything: it builds the 8-direction row (S, SW, W, NW, N, NE, E, SE), builds idle, move, attack, block and shoot animations for all 8 headings (move uses the real stepping poses, the rest use free built-in motion), and saves both sheets with their JSON. The asset should face the way the Camera menu says (south-east, south-west, or front).</p>
+    <details id="chassisBox"><summary>Chassis and weapons</summary>
+      <p class="note">1) Set Asset type to Chassis, describe the faction armor build, generate, then Set as faction chassis. 2) New characters for that faction start from this same body. 3) Add weapons one at a time below, optionally inside a lasso.</p>
+      <label style="color:var(--text)"><input type="checkbox" id="useChassis" checked>Use the faction chassis for new characters</label>
+      <button class="go alt" id="setChassis">Set as faction chassis</button><button class="go alt" id="clrChassis">Clear chassis</button>
+      <div class="note" id="chState"></div>
+      <input id="wpnTxt" placeholder="Weapon, for example plasma pistol with gold trim">
+      <select id="wpnAt"><option>in the right hand</option><option>in the left hand</option><option>held in both hands</option><option>on the back</option><option>on the hip</option></select>
+      <button class="go" id="wpnAdd">Add weapon (1 image)</button>
+    </details>
+    <details id="teamBox"><summary>Team colors (red and blue)</summary>
+      <p class="note">Tap the accent color on the preview above (the trim, wings or lights), then make the variants. Only that color family changes, brightness stays. If an 8-direction sheet is built, its sheets are recolored and saved too.</p>
+      <div class="note" id="teamTxt">No color picked.</div>
+      <button class="go alt" id="teamRed">Make red team</button><button class="go alt" id="teamBlue">Make blue team</button>
+    </details>
+    <details id="batchBox"><summary>Batch: one subject per line, auto-saved</summary>
+      <textarea id="batchIn" rows="5" placeholder="Hive Guard rifleman, red armor&#10;Sentinel walker, red armor"></textarea>
+      <button class="go" id="batchGo">Generate and save all (1 image each)</button>
+      <p class="note">Uses the Camera, Pixel size and Save to settings above. Stops on the first failure.</p>
+    </details>
+    <details id="chatBox"><summary>Talk it through (fix this image)</summary>
+      <div class="chat" id="chatLog"></div>
+      <button class="go alt" id="lassoBtn">Lasso: off</button><button class="go alt" id="lassoClr" hidden>Clear lasso</button>
+      <div class="stage" id="lassoStage" hidden><canvas id="lassoCv" style="touch-action:none"></canvas></div>
+      <textarea id="chatIn" rows="2" placeholder="Tell me what looks wrong, for example: the sword is too small and the face is turned away"></textarea>
+      <button class="go" id="chatSend">Discuss</button>
+      <button class="go alt" id="chatApply" hidden>Apply this edit (1 image)</button>
+      <button class="go alt" id="chatDirect">Edit now with my message</button>
+      <button class="go alt" id="chatUndo">Undo last edit</button>
+      <p class="note">Discuss uses only a cheap text model that looks at your image, so you can talk it through freely. Nothing is drawn until you tap Apply or Edit now, which makes a single image edit.</p>
+    </details>
+    <p class="note">Saves go to the faction and folder chosen under "Save to" near the top of the page, and are listed in the Project Files tab.</p>
+  </section>
+
+  <!-- TAB 2 -->
+  <section class="tab" id="tab-anim">
+    <label>Source sprite (the PNG you made in tab 1, or upload one)</label>
+    <button class="go" id="aUse">Use current asset from tab 1</button>
+    <input id="aFile" type="file" accept="image/png">
+    <div id="splitPanel" hidden>
+      <div class="note" id="splitInfo"></div>
+      <div class="row"><div><label>Merge gap (px): pieces closer than this count as one sprite</label>
+        <select id="splitGap"><option value="auto">Auto</option><option>0</option><option>2</option><option>4</option><option>8</option><option>16</option><option>32</option></select></div></div>
+      <div class="lib" id="splitLib"></div><br>
+      <button class="go alt" id="splitLibAll">Save all to project</button>
+    </div>
+    <div class="row">
+      <div><label>Frames per animation</label><select id="aN"><option>4</option><option>6</option><option selected>8</option><option>12</option></select></div>
+      <div><label>Speed (fps)</label><select id="aFps"><option>6</option><option selected>10</option><option>12</option><option>16</option></select></div>
+      <div><label>Direction</label><select id="aDirSel"><option value="front">Front (as drawn)</option><option value="back">Back</option><option value="left">Left</option><option value="right">Right</option></select></div>
+      <div><label>Preview</label><select id="aSel"><option value="idle">Idle (breathing)</option><option value="move">Move (walk)</option><option value="attack">Attack</option><option value="block">Block</option><option value="shoot">Shoot</option></select></div>
+    </div>
+    <div class="stage"><canvas id="aPrev" width="64" height="64"></canvas></div>
+    <button class="go alt" id="aDirGen">Generate this direction</button>
+    <button class="go" id="aSheet4">Generate all 4 directions (1 image)</button>
+    <button class="go alt" id="aSheetSave">Save 2x2 turnaround</button>
+    <p class="note">The 4-direction button draws one 2x2 sheet (front, back / left, right), cuts it into four matching sprites and loads them as the directions. It replaces any back, left or right already made. Save 2x2 turnaround stores the four views as one PNG in that same order.</p>
+    <p class="note">Pick Back, Left or Right, then tap Generate: the first one is drawn by Gemini from your front sprite (1 image). Left and right mirror each other for free once one exists. Then pose that direction with the AI buttons below, and repeat for each direction. The export includes every direction you have made.</p>
+    <button class="go aiBtn" id="aAI">AI attack swing</button>
+    <button class="go aiBtn" id="aBlk">AI block</button>
+    <button class="go aiBtn" id="aShoot">AI shoot</button>
+    <button class="go aiBtn" id="aMove">AI move</button>
+    <button class="go alt" id="aAIoff">Built-in motion for the previewed one</button>
+    <p class="note">Each AI button redraws your character in 4 poses (using the sprite as reference) and uses them as that animation's row. Each costs 4 to 8 image generations, since a pose that adds or loses a lot of body is retried once. Shoot uses the character's own ranged weapon, or a sci-fi rifle if it has none.</p>
+    <div id="poseBox" hidden>
+      <label>AI poses for the previewed animation (tap one to fix it)</label>
+      <div class="lib" id="poseStrip"></div>
+      <div class="note" id="poseTxt"></div><br>
+      <textarea id="poseNote" rows="2" placeholder="What is wrong with this pose? For example: raise the sword higher and keep the left arm down"></textarea>
+      <button class="go" id="poseRedo">Redo this pose with my note</button>
+      <p class="note">This redraws only the selected pose (1 to 2 images), using your note and the current pose as guidance, so you don't have to rerun the whole set.</p>
+    </div>
+    <details id="rigBox"><summary>Skeleton (movement rig)</summary>
+      <p class="note" id="rigTxt">Pick a step, then touch the sprite: Hip sets where the body bends, Legs sets where the legs split, Arm lets you lasso the weapon arm, then Shoulder sets its pivot. The arm then swings on its own in attack, shoot, block and walking.</p>
+      <button class="go alt" id="rigHip">1 Hip line</button><button class="go alt" id="rigSplit">2 Leg split</button><button class="go alt" id="rigArm">3 Lasso arm</button><button class="go alt" id="rigPivot">4 Shoulder</button><button class="go alt" id="rigReset">Reset rig</button>
+      <div class="stage"><canvas id="rigCv" style="touch-action:none"></canvas></div>
+    </details>
+    <div class="note" id="aInfo">Load a sprite to build idle, attack and block animations.</div><br>
+    <button class="go" id="aDl">Download sheet + JSON</button>
+    <button class="go alt" id="aLib">Save to project</button>
+    <p class="note">Built-in motion squashes, leans, lunges and flashes your single sprite, so limbs don't move independently. The sheet has one row per animation: idle, move, attack, block, shoot. The body bends at the hips with the feet planted, and the legs step during Move.</p>
+  </section>
+
+  <!-- TAB 3 -->
+  <section class="tab" id="tab-tiles">
+    <label>Tile sheet or map image</label>
+    <input id="tileFile" type="file" accept="image/png,image/jpeg">
+    <div class="row">
+      <div><label>Tile width</label><input id="tw" type="number" value="64" min="1"></div>
+      <div><label>Tile height</label><input id="th" type="number" value="64" min="1"></div>
+      <div><label>Offset X</label><input id="ox" type="number" value="0"></div>
+      <div><label>Offset Y</label><input id="oy" type="number" value="0"></div>
+      <div><label>Spacing</label><input id="sp" type="number" value="0" min="0"></div>
+    </div>
+    <div class="row">
+      <div><label>Cell shape</label>
+        <select id="mode"><option value="sq">Square</option><option value="hexp">Hex, pointy top</option><option value="hexf">Hex, flat top</option></select></div>
+      <div><label>Zoom</label><select id="zoom"><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+      <div><label><input type="checkbox" id="skip" checked>Skip empty tiles</label></div>
+    </div>
+    <div class="stage" style="justify-content:flex-start;align-items:flex-start"><canvas id="tcv" width="64" height="64"></canvas></div>
+    <div class="note" id="tInfo">Load an image, then nudge the offsets until the overlay lines up.</div><br>
+    <button class="go" id="dlAtlas">Download atlas + JSON</button>
+    <button class="go alt" id="saveAtlas">Save to project (Tilesets folder)</button>
+    <p class="note">The JSON lists every tile's source and atlas position. In square mode it also stores edge "sockets" (matching edge colors) so a procedural generator can decide which tiles may touch.</p>
+  </section>
+  <!-- TAB 4 -->
+  <section class="tab" id="tab-files">
+    <div class="note" id="fCounts"></div>
+    <div class="note" id="fWarn" hidden>Browser storage is not available here, so saved files only last until you close this page. Export a ZIP before leaving.</div><br>
+    <button class="go" id="fZip">Export folders (.zip)</button>
+    <button class="go alt" id="fSave">Save project file</button>
+    <button class="go alt" id="fLoadBtn">Load project file</button>
+    <input id="fLoad" type="file" accept=".json,application/json" hidden>
+    <p class="note">The ZIP layout is ProjectName / Faction / Subfaction / Asset type / Asset name / files. Animation sheets, JSON and tile atlases sit inside the asset folder, all empty folders are included, and the style bible is added. The project file is one backup of the style bible, palette and every saved image, which you can load back into this app.</p>
+    <div class="row"><div><label>Faction</label><select id="fFac"></select></div><div><label>Subfaction</label><select id="fSub"></select></div><div><label>Asset type</label><select id="fType"></select></div></div>
+    <div class="bible" id="bulk"><div class="note" id="bCount"></div>
+      <div class="row"><div><select id="bFac"></select></div><div><select id="bSub"></select></div><div><select id="bType"></select></div></div>
+      <button class="go" id="bMove">Move selected</button>
+      <button class="go alt" id="bZip">Export selected (.zip)</button>
+      <button class="go alt" id="bDel">Delete selected</button>
+      <button class="go alt" id="bClear">Clear</button>
+      <input id="bName" placeholder="New name for the selected asset">
+      <button class="go alt" id="bRen">Rename selected asset</button>
+      <input id="dsTrigger" placeholder="Training trigger word, for example impstyle">
+      <button class="go alt" id="bDs">Export training set (selected)</button>
+      <p class="note">Tick boxes in the tree below. Each folder has its own Export button (a ZIP of just that branch), tap a file to download or manage it alone, and Export folders (.zip) above exports everything.</p>
+    </div>
+    <div id="fGrid"></div>
+    <div id="fDetail" hidden>
+      <div class="note" id="fPath"></div><br>
+      <div class="row"><div><label>Move to faction</label><select id="fMoveFac"></select></div><div><label>Subfaction</label><select id="fMoveSub"></select></div><div><label>Asset type</label><select id="fMoveType"></select></div></div>
+      <button class="go" id="fDl">Download</button>
+      <button class="go alt" id="fAnim">Open in Animation Studio</button>
+      <button class="go alt" id="fMoveBtn">Move</button>
+      <button class="go alt" id="fDel">Delete</button>
+    </div>
+  </section>
+  <!-- TAB 5 -->
+  <section class="tab" id="tab-iso">
+    <label>Photos or screenshots (pick several)</label>
+    <input id="isoFile" type="file" accept="image/png,image/jpeg" multiple>
+    <div class="row">
+      <div><label>Background becomes</label><select id="isoMode"><option value="matte">A flat matte color</option><option value="clear">Transparent</option></select></div>
+      <div><label>Matte color</label><input id="isoColor" type="color" value="#808080"></div>
+      <div><label>Method</label><select id="isoMeth"><option value="local">Free: smooth backgrounds</option><option value="ai">AI: any background (1 image each)</option></select></div>
+    </div>
+    <label style="display:inline-block">Cutout strength (free method)</label><input id="isoTol" type="range" min="10" max="200" value="90" style="width:140px;display:inline-block;margin:0 0 0 8px">
+    <button class="go" id="isoGo">Isolate</button>
+    <div class="grid" id="isoGrid"></div>
+    <button class="go" id="isoSave" hidden>Save all to project (References)</button>
+    <p class="note">The free method works on smooth studio-style backgrounds like your character portraits. Busy or glowing backgrounds need the AI method, which asks Gemini to repaint the background as one flat color. Saved photos go to the current faction and subfaction under References. Use for Pixelate loads one as the style reference.</p>
+  </section>
+</main>
+
+<script>
+const BAKED_KEY='';
+const $=id=>document.getElementById(id);
+const ls={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+const msg=t=>{$('msg').textContent=t};
+const prog={d:0,start(){if(!this.d++){$('msgWrap').classList.add('busy');$('pbar').hidden=false;this.ind()}},
+  ind(){const i=$('pbar').firstElementChild;i.className='ind';i.style.width=''},
+  det(n,t){const i=$('pbar').firstElementChild;i.className='';i.style.width=Math.max(4,Math.round(100*n/t))+'%'},
+  end(){if(this.d>0&&!--this.d){$('msgWrap').classList.remove('busy');$('pbar').hidden=true}}};
+const tick=()=>new Promise(r=>setTimeout(r,30));
+const mk=(w,h)=>{const c=document.createElement('canvas');c.width=w;c.height=h;return c};
+const toBlob=c=>new Promise(r=>c.toBlob(r,'image/png'));
+const loadImg=u=>new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('Could not read image'));i.src=u});
+const b64Of=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]||'');r.onerror=()=>rej(r.error);r.readAsDataURL(b)});
+const pfSave=async(path,blob)=>{if(!window.PackFlowProject)return null;try{return window.PackFlowProject.saveFile(path,await b64Of(blob))}catch(e){return null}};
+const dl=(b,n)=>{if(window.PackFlowProject){const folder=/\.zip$/i.test(n)?'builds':/atlas|tile/i.test(n)?'tiles/downloads':'sprites/downloads';
+  pfSave(folder+'/'+n,b).then(p=>msg(p?'Saved to the PackFlow project: '+p:'Could not save '+n+' to the project.'));return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click()};
+const slug=s=>s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'asset';
+
+/* ---------- Projects & settings ---------- */
+const DEF_STYLE='32-bit hi-bit pixel art for a grimdark sci-fi tactical strategy game. Isometric hex-grid perspective. Palette built on Void Black #101216 and Solar Yellow #F3C623 with muted steel blues and greys. Hard dark outlines, high contrast, no anti-aliasing, no gradients, light from the top-left, consistent proportions across all assets.';
+let projects=ls.get('imp:projects',{'Imperium RTS':{style:DEF_STYLE,pal:'#101216,#F3C623,#1B3A60,#8A93A6,#F0F2F5'}});
+let cur=ls.get('imp:cur','Imperium RTS'); if(!projects[cur])cur=Object.keys(projects)[0];
+const MODELS=['gemini-nano-banana-2.1','gemini-3-pro-image','gemini-3.1-flash-image'];
+let cfg=ls.get('imp:cfg',{key:'',model:MODELS[0]});
+if(!cfg.key&&BAKED_KEY)cfg.key=BAKED_KEY;
+// PackFlow: the key lives in Android (Keystore-encrypted), never in localStorage.
+const PF_KEYS=window.PackFlowKeys||null,PF_PROJECT=window.PackFlowProject||null;
+if(PF_KEYS){try{cfg.key=PF_KEYS.geminiKey()||''}catch(e){cfg.key=''}}
+const saveCfg=()=>{if(PF_KEYS){try{PF_KEYS.setGeminiKey(cfg.key||'')}catch(e){}ls.set('imp:cfg',{...cfg,key:''})}else ls.set('imp:cfg',{...cfg})};
+if(!cfg.model||/^gemini-2\.5-flash-image|-image-preview$/.test(cfg.model))cfg.model=MODELS[0]; // retired by Google
+const P=()=>projects[cur];
+const saveProj=()=>{ls.set('imp:projects',projects);ls.set('imp:cur',cur)};
+function showSwatches(){
+  const s=$('swatches');s.innerHTML='';
+  (P().pal||'').split(',').map(t=>t.trim()).filter(t=>/^#[0-9a-f]{6}$/i.test(t)).forEach(hx=>{
+    const e=document.createElement('span');e.style.background=hx;e.title=hx;s.appendChild(e)});
+}
+function drawProj(){
+  const s=$('proj');s.innerHTML='';
+  Object.keys(projects).forEach(n=>{const o=new Option(n,n);o.selected=n===cur;s.add(o)});
+  $('style').value=P().style;
+  if(window.filesReady){drawDest();renderFiles()}
+  const p=P().pal||'',known=[...$('palSel').options].some(o=>o.value===p&&p!=='custom');
+  $('palSel').value=known?p:'custom';$('pal').hidden=known;$('pal').value=known?'':p;showSwatches();$('undoStyle').hidden=P().prevStyle==null;
+}
+$('proj').onchange=e=>{cur=e.target.value;saveProj();drawProj()};
+$('newProj').onclick=()=>{
+  const n=(prompt('Project name?')||'').trim(); if(!n||projects[n])return;
+  projects[n]={style:P().style,pal:P().pal,tree:JSON.parse(JSON.stringify(tree()))};cur=n;saveProj();drawProj();
+};
+let delTimer=null;
+$('delProj').onclick=async()=>{ // two taps to confirm, since pop-up dialogs can be blocked
+  const b=$('delProj');
+  if(Object.keys(projects).length<2)return msg('You need at least one project, so this one cannot be deleted.');
+  if(!delTimer){
+    const n=(await allAssets()).filter(r=>r.project===cur).length;
+    b.textContent='Tap again to delete "'+cur+'"'+(n?' and its '+n+' saved files':'');
+    delTimer=setTimeout(()=>{b.textContent='Delete project';delTimer=null},4000);return}
+  clearTimeout(delTimer);delTimer=null;b.textContent='Delete project';
+  const gone=cur;for(const r of (await allAssets()).filter(r=>r.project===gone))await delAsset(r.id);
+  delete projects[cur];cur=Object.keys(projects)[0];saveProj();drawProj();msg('Deleted "'+gone+'" and its saved files.');
+};
+$('style').oninput=e=>{P().style=e.target.value;saveProj()};
+$('palSel').onchange=e=>{const v=e.target.value;$('pal').hidden=v!=='custom';
+  P().pal=v==='custom'?$('pal').value:v;saveProj();showSwatches();render()};
+$('pal').oninput=e=>{P().pal=e.target.value;saveProj();showSwatches()};
+$('pal').onchange=()=>render();
+['key'].forEach(k=>{$(k).value=cfg[k]||'';$(k).oninput=e=>{cfg[k]=e.target.value.trim();saveCfg()}});
+const knownModel=MODELS.includes(cfg.model);
+$('modelSel').value=knownModel?cfg.model:'custom';$('model').hidden=knownModel;$('model').value=knownModel?'':cfg.model;
+$('modelSel').onchange=e=>{
+  if(e.target.value==='custom'){$('model').hidden=false;$('model').focus()}
+  else{cfg.model=e.target.value;$('model').hidden=true;saveCfg()}};
+$('model').oninput=e=>{cfg.model=e.target.value.trim()||MODELS[0];saveCfg()};
+window.addEventListener('error',e=>msg('Script error: '+e.message));
+window.addEventListener('unhandledrejection',e=>msg('Error: '+(e.reason&&e.reason.message||e.reason)));
+drawProj();
+let storeOk=false;try{localStorage.setItem('imp:t','1');storeOk=localStorage.getItem('imp:t')==='1'}catch{}
+$('keyState').textContent=cfg.key&&BAKED_KEY===cfg.key?'Key is built into this file.':storeOk?'This page can remember your key.':'This page cannot remember anything (opened from a file link). Use the button below.';
+if(PF_KEYS){$('bakeKey').hidden=true;$('keyState').textContent='Stored encrypted on this phone by PackFlow (Android Keystore). Music and Voice use the same key.'}
+$('bakeKey').onclick=async()=>{if(PF_KEYS)return;
+  if(!cfg.key)return msg('Type your key first.');
+  let src='';try{src=await (await fetch(location.href)).text()}catch{}
+  if(!/const BAKED_KEY='/.test(src))src='<!DOCTYPE html>\n'+document.documentElement.outerHTML;
+  src=src.replace(/const BAKED_KEY='[^']*'/,()=>"const BAKED_KEY='"+cfg.key.replace(/[^A-Za-z0-9_\-]/g,'')+"'");
+  dl(new Blob([src],{type:'text/html'}),'imperium_asset_suite_with_key.html');
+  msg('Saved a copy with your key built in. Open that copy from now on, and do not share or upload it.');
+};
+
+/* ---------- Tabs ---------- */
+const TITLES={gen:'Asset Generation',anim:'Animation Studio',tiles:'Map Tile Slicer',files:'Project Files',iso:'Photo Isolate'};
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id==='tab-'+name));
+  document.querySelectorAll('.nav').forEach(b=>b.classList.toggle('on',b.dataset.tab===name));
+  $('title').textContent=TITLES[name];
+  if(name==='anim'&&!aStore.front&&curC)loadSource(curC); // open with the current asset ready
+  if(name==='files'&&window.filesReady)renderFiles();
+}
+document.querySelectorAll('.nav').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+
+/* ---------- Shared image helpers ---------- */
+function keyOut(c,tol){ // make pixels near the top-left color transparent
+  const x=c.getContext('2d'),d=x.getImageData(0,0,c.width,c.height),a=d.data,r=a[0],g=a[1],b=a[2];
+  for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-r)+Math.abs(a[i+1]-g)+Math.abs(a[i+2]-b)<tol)a[i+3]=0;
+  const W=c.width,H=c.height; // peel the magenta-tinted fringe off the edge, two pixels deep
+  for(let pass=0;pass<2;pass++){const kill=[];for(let y=0;y<H;y++)for(let xx=0;xx<W;xx++){const i=(y*W+xx)*4;if(!a[i+3]||!(a[i]>a[i+1]+35&&a[i+2]>a[i+1]+35))continue;
+    if((xx>0&&!a[i-1])||(xx<W-1&&!a[i+7])||(y>0&&!a[i-W*4+3])||(y<H-1&&!a[i+W*4+3]))kill.push(i)}kill.forEach(i=>a[i+3]=0)}
+  x.putImageData(d,0,0);
+}
+
+/* ---------- TAB 1: Asset generation ---------- */
+const CATS={Chassis:'single full-body armored infantry body in the standard neutral ready pose: standing upright, feet shoulder width apart, arms hanging relaxed and slightly forward, both hands open and EMPTY, no weapons, no extra gear, plain unadorned armor',Character:'single full-body unit sprite, standing pose, readable silhouette',Building:'single isometric building or structure',
+  Terrain:'single hex terrain tile, seamless edges, viewed from above',Foliage:'single plant, tree or bush',Rocks:'single rock or boulder cluster',
+  Prop:'single small prop or object, such as a crate or barricade',Icon:'square UI icon, centered, bold shape','Infantry unit':'single infantry soldier unit sprite, full body, readable silhouette at small size','Heavy armor unit':'single heavy armor unit such as a tank or walker, whole vehicle visible','Weapon or gear':'single weapon or piece of gear shown on its own, centered, no character holding it'};
+let ref=null,raw=null,curC=null,photoSrc=null;
+
+const readRef=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{setRef(r.result);msg('Photo loaded. Use the buttons in the style panel to build the palette or style bible from it.')};r.readAsDataURL(f)};
+$('refFile').onchange=$('styleFile').onchange=readRef;
+
+function extractPalette(img,n){ // median cut on exact pixel colors
+  const k=Math.min(1,160/Math.max(img.width,img.height)),c=mk(Math.max(1,Math.round(img.width*k)),Math.max(1,Math.round(img.height*k))),x=c.getContext('2d');
+  x.imageSmoothingEnabled=false;x.drawImage(img,0,0,c.width,c.height);
+  const d=x.getImageData(0,0,c.width,c.height).data,m=new Map();
+  for(let i=0;i<d.length;i+=4){if(d[i+3]<128)continue;const key=d[i]<<16|d[i+1]<<8|d[i+2];m.set(key,(m.get(key)||0)+1)}
+  const px=[...m].map(([key,w])=>({c:[key>>16&255,key>>8&255,key&255],w}));
+  if(!px.length)throw new Error('The photo has no visible pixels.');
+  const boxes=[px];
+  while(boxes.length<n){
+    let bi=-1,bs=0,ch=0;
+    boxes.forEach((b,i)=>{if(b.length<2)return;for(let q=0;q<3;q++){let lo=255,hi=0;for(const p of b){lo=Math.min(lo,p.c[q]);hi=Math.max(hi,p.c[q])}if(hi-lo>bs){bs=hi-lo;bi=i;ch=q}}});
+    if(bi<0)break;
+    const b=boxes[bi].sort((a,z)=>a.c[ch]-z.c[ch]),half=b.reduce((s,p)=>s+p.w,0)/2;let acc=0,cut=1;
+    for(let i=0;i<b.length-1;i++){acc+=b[i].w;cut=i+1;if(acc>=half)break}
+    boxes.splice(bi,1,b.slice(0,cut),b.slice(cut));
+  }
+  const lum=c=>.3*c[0]+.59*c[1]+.11*c[2];
+  return boxes.map(b=>{const t=b.reduce((s,p)=>s+p.w,0);return[0,1,2].map(q=>Math.round(b.reduce((s,p)=>s+p.c[q]*p.w,0)/t))})
+    .sort((a,z)=>lum(a)-lum(z)).map(c=>'#'+c.map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase());
+}
+$('mkPal').onclick=async()=>{
+  if(!ref)return msg('Add a style photo first.');
+  try{const list=extractPalette(subjectCanvas(await loadImg(ref)),+$('ncol').value);
+    P().pal=list.join(',');saveProj();drawProj();render();msg(list.length+' colors taken from the photo and applied as the palette.')}
+  catch(e){msg('Error: '+e.message)}
+};
+const inl=u=>({inlineData:{mimeType:u.slice(5,u.indexOf(';')),data:u.split(',')[1]}});
+async function geminiText(parts){
+  const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',
+    {method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},body:JSON.stringify({contents:[{parts}]})});
+  const j=await r.json();if(!r.ok)throw new Error(j.error?.message||('HTTP '+r.status));
+  return (j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim();
+}
+$('mkStyle').onclick=async()=>{
+  if(!cfg.key)return msg('Add your Gemini API key in the sidebar.');
+  if(!ref)return msg('Add a style photo first.');
+  $('mkStyle').disabled=true;msg('Studying the photo…');
+  try{
+    const pal=(P().pal||'').trim();
+    const t=await geminiText([{text:'Write a style bible for a game art pipeline from this reference image. In 4 to 6 plain sentences an image generator can follow, cover: pixel density and rendering (or painterly vs pixel), outline treatment, shading and light direction, camera perspective, color character, level of detail and mood. Do not describe what the subject is, only how it is drawn. Output only the paragraph, no headings or bullets.'+(pal?' End by stating this exact palette: '+pal+'.':'')},
+      inl(ref)]);
+    if(!t)throw new Error('No description came back.');
+    P().prevStyle=P().style;P().style=t;$('style').value=t;$('undoStyle').hidden=false;saveProj();
+    msg('Style bible written from your photo. Edit it freely, or undo to restore the old one.');
+  }catch(e){msg('Error: '+e.message)}
+  $('mkStyle').disabled=false;
+};
+$('undoStyle').onclick=()=>{if(P().prevStyle==null)return;P().style=P().prevStyle;$('style').value=P().style;P().prevStyle=null;$('undoStyle').hidden=true;saveProj()};
+function setRef(url){ref=url;$('refPrev').src=url;$('refPrev').hidden=false}
+
+async function gemini(prompt,refUrl=ref,extraUrl){
+  const parts=[{text:prompt}];
+  if(refUrl)parts.push(inl(refUrl));
+  if(extraUrl)parts.push(inl(extraUrl));
+  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model||MODELS[0])}:generateContent`,
+    {method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
+     body:JSON.stringify({contents:[{parts}],generationConfig:{responseModalities:['TEXT','IMAGE']}})});
+  const j=await r.json();if(!r.ok)throw new Error(j.error?.message||('HTTP '+r.status));
+  const p=(j.candidates?.[0]?.content?.parts||[]).find(p=>p.inlineData||p.inline_data);
+  if(!p)throw new Error('The model returned no image. Try rewording the subject.');
+  const d=p.inlineData||p.inline_data;return `data:${d.mimeType||d.mime_type};base64,${d.data}`;
+}
+async function doGen(){
+  if(!cfg.key)return msg('Add your Gemini API key in the sidebar.');
+  const cat=$('cat').value,d=$('desc').value.trim();if(!d)return msg('Describe the subject first.');
+  const ch=cat!=='Chassis'&&$('useChassis').checked&&(P().chassis||{})[dest.faction];
+  const prompt=`${STY()}\n\nAsset type: ${cat}, ${CATS[cat]}.\nSubject: ${d}\nCamera: ${$('view').value}.\nLighting: flat neutral white light, no colored rim light, no color cast.\nBackground: one flat solid #FF00FF magenta fill with no shadow, no text, no border.`
+    +(ch?'\nThe attached image is the standard chassis for this faction. Keep its exact body build, proportions, pose, camera angle and size. Change only the armor design, markings and colors described in the subject. Hands stay empty unless the subject names a weapon.':ref?'\nMatch the art style and proportions of the attached reference image, taking only the subject own material colors. Ignore its background, ambient or rim lighting and any blue or teal tint.':'');
+  $('gen').disabled=true;msg('Generating…');
+  try{raw=await loadImg(await gemini(prompt,ch||(ref&&await cleanRef(ref))));photoSrc=null;resetChat();render();msg('Done. Change pixel size or cutout strength to re-process.')}
+  catch(e){msg('Error: '+e.message+(/not found|no longer|deprecat|retired/i.test(e.message)?' Pick a different model in the sidebar.':''))}
+  $('gen').disabled=false;
+}
+$('gen').onclick=doGen;
+function processImg(img,n,tol,pop){
+  const full=mk(img.width,img.height);full.getContext('2d').drawImage(img,0,0);keyOut(full,tol);if(!$('wb')||$('wb').checked)neutralize(full);
+  let c=full;
+  if(n){const k=n/Math.max(full.width,full.height),w=Math.max(1,Math.round(full.width*k)),h=Math.max(1,Math.round(full.height*k));
+    c=downMedian(full,0,0,full.width,full.height,w,h)}
+  toneMatch(c,P().tone);snapPalette(c,PAL());if(pop)popColors(c,pop);return c;
+}
+function cutPhoto(img,D){ // background = the smooth studio gradient, modeled per row from both edges; flood from the border through it
+  const k=Math.min(1,768/Math.max(img.width,img.height)),w=Math.round(img.width*k),h=Math.round(img.height*k),c=mk(w,h),x=c.getContext('2d');
+  x.drawImage(img,0,0,w,h);const d=x.getImageData(0,0,w,h),a=d.data,seen=new Uint8Array(w*h),st=[],nb=(p,f)=>{const x0=p%w,y0=(p-x0)/w;if(x0>0)f(p-1);if(x0<w-1)f(p+1);if(y0>0)f(p-w);if(y0<h-1)f(p+w)};
+  let tp=0;for(let i=3;i<a.length;i+=4)if(a[i]<250)tp++;if(tp>w*h*.02)return c; // already cut out
+  const med=v=>{v.sort((p,q)=>p-q);return v[v.length>>1]},e=Math.min(6,w>>2),row=[];
+  for(let y=0;y<h;y++){const t=[[],[],[]];for(let xx=0;xx<w;xx++){if(xx>=e&&xx<w-e)xx=w-e;const i=(y*w+xx)*4;for(let q=0;q<3;q++)t[q].push(a[i+q])}row.push(t.map(med))}
+  const bg=row.map((_,y)=>[0,1,2].map(q=>med(row.slice(Math.max(0,y-4),y+5).map(r=>r[q])))); // smooth over rows so a figure touching the edge cannot skew it
+  const cand=p=>{const y=(p/w)|0,i=p*4;return Math.abs(a[i]-bg[y][0])+Math.abs(a[i+1]-bg[y][1])+Math.abs(a[i+2]-bg[y][2])<D};
+  for(let i=0;i<w;i++)for(const p of[i,(h-1)*w+i])if(!seen[p]&&cand(p)){seen[p]=1;st.push(p)}
+  for(let j=0;j<h;j++)for(const p of[j*w,j*w+w-1])if(!seen[p]&&cand(p)){seen[p]=1;st.push(p)}
+  while(st.length){const p=st.pop();nb(p,q=>{if(!seen[q]&&cand(q)){seen[q]=1;st.push(q)}})}
+  const lab=new Int32Array(w*h),sizes=[0];let nl=0;
+  for(let s0=0;s0<w*h;s0++){if(seen[s0]||lab[s0])continue;let n=0;lab[s0]=++nl;st.push(s0);
+    while(st.length){const p=st.pop();n++;nb(p,q=>{if(!seen[q]&&!lab[q]){lab[q]=nl;st.push(q)}})}sizes.push(n)}
+  const tot=sizes.reduce((u,v)=>u+v,0);
+  for(let p=0;p<w*h;p++)if(seen[p]||sizes[lab[p]]<tot*.01)a[p*4+3]=0;
+  x.putImageData(d,0,0);return c;
+}
+function popColors(c,k){ // more saturation and a little lift, applied per color so the palette size does not change
+  if(!k)return;const x=c.getContext('2d'),d=x.getImageData(0,0,c.width,c.height),a=d.data,m=new Map();
+  for(let i=0;i<a.length;i+=4){if(!a[i+3])continue;const key=a[i]<<16|a[i+1]<<8|a[i+2];let o=m.get(key);
+    if(!o){const r=a[i]/255,g=a[i+1]/255,b=a[i+2]/255,mx=Math.max(r,g,b),dl=mx-Math.min(r,g,b);let h=0;
+      if(dl)h=mx===r?((g-b)/dl+6)%6:mx===g?(b-r)/dl+2:(r-g)/dl+4;
+      const s=Math.min(1,(mx?dl/mx:0)*(1+.5*k)),v=Math.min(1,Math.pow(mx,1-.3*k)*(1+.06*k)),f=n=>{const q=(n+h)%6;return v-v*s*Math.max(0,Math.min(q,4-q,1))};
+      o=[f(5),f(3),f(1)].map(t=>Math.round(t*255));m.set(key,o)}
+    a[i]=o[0];a[i+1]=o[1];a[i+2]=o[2]}
+  x.putImageData(d,0,0);
+}
+function downMedian(src,sx,sy,sw,sh,w,h){ // block-median downscale: flat colors stay true, no blending with neighbors
+  const c=mk(w,h),x=c.getContext('2d'),sd=src.getContext('2d').getImageData(sx,sy,sw,sh).data,od=x.createImageData(w,h),o=od.data,R=[],G=[],B=[],m=v=>{v.sort((p,q)=>p-q);return v[v.length>>1]};
+  for(let ty=0;ty<h;ty++)for(let tx=0;tx<w;tx++){const x0=Math.floor(tx*sw/w),x1=Math.max(x0+1,Math.floor((tx+1)*sw/w)),y0=Math.floor(ty*sh/h),y1=Math.max(y0+1,Math.floor((ty+1)*sh/h));
+    R.length=G.length=B.length=0;let tot=0;
+    for(let yy=y0;yy<y1;yy++)for(let xx=x0;xx<x1;xx++){const i=(yy*sw+xx)*4;tot++;if(sd[i+3]){R.push(sd[i]);G.push(sd[i+1]);B.push(sd[i+2])}}
+    if(R.length*2<tot)continue;const j=(ty*w+tx)*4;o[j]=m(R);o[j+1]=m(G);o[j+2]=m(B);o[j+3]=255}
+  x.putImageData(od,0,0);return c;
+}
+function outlinePass(c){ // one-pixel dark outline: edge pixels become a darkened copy of the color just inside
+  const w=c.width,h=c.height,x=c.getContext('2d'),d=x.getImageData(0,0,w,h),a=d.data,op=(u,v)=>u>=0&&v>=0&&u<w&&v<h&&a[(v*w+u)*4+3]>0,edge=[];
+  for(let v=0;v<h;v++)for(let u=0;u<w;u++)if(op(u,v)&&!(op(u-1,v)&&op(u+1,v)&&op(u,v-1)&&op(u,v+1)))edge.push([u,v]);
+  const set=new Set(edge.map(([u,v])=>v*w+u)),out=[];
+  edge.forEach(([u,v])=>{let r=0,g=0,b=0,n=0;for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1]]){const q=(v+dy)*w+u+dx;if(op(u+dx,v+dy)&&!set.has(q)){r+=a[q*4];g+=a[q*4+1];b+=a[q*4+2];n++}}
+    const i=(v*w+u)*4;if(!n){r=a[i];g=a[i+1];b=a[i+2];n=1}out.push([i,r/n*.42,g/n*.42,b/n*.42])});
+  out.forEach(([i,r,g,b])=>{a[i]=r;a[i+1]=g;a[i+2]=b});x.putImageData(d,0,0);
+}
+function pixelPhoto(img,n){ // straight from the photo: exact colors, its own palette, no image cost
+  const cut=cutPhoto(img,Math.round(+$('tol').value*.38)),b=bbox(cut),cw=b.r-b.l+1,ch=b.b-b.t+1,k=n/Math.max(cw,ch),w=Math.max(1,Math.round(cw*k)),h=Math.max(1,Math.round(ch*k)),c=downMedian(cut,b.l,b.t,cw,ch,w,h);
+  snapPalette(c,extractPalette(c,+$('ncol').value).join(','));popColors(c,+$('pop').value/100);return c;
+}
+function render(){let c=null;if(photoSrc)c=pixelPhoto(photoSrc,+$('px').value||128);else if(raw)c=processImg(raw,+$('px').value,+$('tol').value,+$('pop').value/100);if(c){if($('outline').checked)outlinePass(c);showAsset(c)}}
+function showAsset(c){
+  curC=c;const o=$('out');o.width=c.width;o.height=c.height;o.getContext('2d').drawImage(c,0,0);
+  o.style.width=Math.min(512,Math.max(c.width,c.width*Math.floor(384/Math.max(c.width,c.height))))+'px';
+}
+$('px').onchange=$('tol').onchange=$('pop').onchange=$('outline').onchange=$('ncol').onchange=$('wb').onchange=render;
+$('pixBtn').onclick=async()=>{if(!ref)return msg('Add the photo first, in the Style reference image box.');
+  photoSrc=await loadImg(ref);raw=null;resetChat();render();msg('Pixelated straight from the photo: exact colors, no image cost. Adjust pixel size, color pop, cutout strength and palette colors.')};
+const clone=c=>{const n=mk(c.width,c.height);n.getContext('2d').drawImage(c,0,0);return n};
+const nameOf=()=>assetName();
+const savePng=async(c,extra,base)=>saveFiles(extra,base,[{ext:'png',blob:await toBlob(c)}]);
+$('toLib').onclick=async()=>{if(!curC)return msg('Nothing to save yet.');const n=await savePng(curC,'',nameOf());msg(`Saved ${n}.png to ${destLabel('')}.`)};
+$('dlOut').onclick=async()=>{if(curC)dl(await toBlob(curC),nameOf()+'.png')};
+$('useRef').onclick=()=>{if(curC){setRef(curC.toDataURL());msg('Current asset will guide the next generations.')}};
+
+/* ---------- Talk it through: discuss cheaply, then apply one image edit ---------- */
+let chat=[],pending='',rawHist=[],chatNote='',lasso=[],lassoOn=false,lassoDown=false;
+const lpath=(c,w,h,pts)=>{c.beginPath();pts.forEach(([u,v],i)=>i?c.lineTo(u*w,v*h):c.moveTo(u*w,v*h));c.closePath()};
+function drawLasso(){if(!lassoOn||!curC)return;const cv=$('lassoCv'),b=curSrcCanvas(),k=Math.min(1,340/b.width);cv.width=Math.round(b.width*k);cv.height=Math.round(b.height*k);
+  const x=cv.getContext('2d');x.drawImage(b,0,0,cv.width,cv.height);
+  if(lasso.length>1){lpath(x,cv.width,cv.height,lasso);x.fillStyle='rgba(243,198,35,.35)';x.fill();x.strokeStyle='#F3C623';x.lineWidth=2;x.stroke()}}
+const lpos=e=>{const r=$('lassoCv').getBoundingClientRect();return[Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)),Math.min(1,Math.max(0,(e.clientY-r.top)/r.height))]};
+$('lassoCv').onpointerdown=e=>{lassoDown=true;lasso=[lpos(e)];e.target.setPointerCapture(e.pointerId);drawLasso()};
+$('lassoCv').onpointermove=e=>{if(lassoDown){lasso.push(lpos(e));drawLasso()}};
+$('lassoCv').onpointerup=()=>{lassoDown=false;msg(lasso.length>2?'Region selected. Describe the change, or tap Edit now: only that region will change.':'Draw a loop around the part to change.')};
+$('lassoBtn').onclick=()=>{lassoOn=!lassoOn;$('lassoBtn').textContent='Lasso: '+(lassoOn?'on':'off');$('lassoStage').hidden=$('lassoClr').hidden=!lassoOn;if(!lassoOn)lasso=[];drawLasso()};
+$('lassoClr').onclick=()=>{lasso=[];drawLasso()};
+function lassoMask(w,h){if(lasso.length<3)return null;const m=mk(w,h),x=m.getContext('2d');x.fillStyle='#000';x.fillRect(0,0,w,h);
+  lpath(x,w,h,lasso);x.fillStyle=x.strokeStyle='#fff';x.lineWidth=Math.max(4,w/80);x.fill();x.stroke();return m}
+function lassoBlend(base,img,m){ // keep the new drawing only inside the lasso, everything else stays byte for byte
+  const t=mk(base.width,base.height),x=t.getContext('2d');x.drawImage(img,0,0,t.width,t.height);
+  const md=m.getContext('2d').getImageData(0,0,m.width,m.height),a=md.data;for(let i=0;i<a.length;i+=4){a[i+3]=a[i];a[i]=a[i+1]=a[i+2]=255}
+  const mm=mk(m.width,m.height);mm.getContext('2d').putImageData(md,0,0);x.globalCompositeOperation='destination-in';x.drawImage(mm,0,0);
+  const o=clone(base);o.getContext('2d').drawImage(t,0,0);return o}
+$('setChassis').onclick=()=>{if(!curC)return msg('Generate or pick an asset first.');const b=curSrcCanvas(),k=Math.min(1,384/Math.max(b.width,b.height)),c=mk(Math.round(b.width*k),Math.round(b.height*k));
+  c.getContext('2d').drawImage(b,0,0,c.width,c.height);P().chassis=P().chassis||{};P().chassis[dest.faction]=c.toDataURL('image/jpeg',.9);saveProj();chState();msg(`Chassis saved for ${dest.faction}.`)};
+$('clrChassis').onclick=()=>{if(P().chassis)delete P().chassis[dest.faction];saveProj();chState();msg('Chassis cleared.')};
+const chState=()=>{$('chState').textContent=(P().chassis||{})[dest.faction]?`${dest.faction} has a chassis. New characters use it.`:`No chassis for ${dest.faction} yet.`};
+$('wpnAdd').onclick=()=>{const t=$('wpnTxt').value.trim();if(!t)return msg('Describe the weapon first.');
+  applyEdit(`Add ${t} ${$('wpnAt').value}. Change only the weapon and the hands or forearms holding it. Body, armor, pose and colors stay identical`)};
+function curSrcCanvas(){ // the original full-color generation if there is one, else the sprite enlarged on magenta
+  let c;if(raw){const k=Math.min(1,768/Math.max(raw.width,raw.height));c=mk(Math.round(raw.width*k),Math.round(raw.height*k));c.getContext('2d').drawImage(raw,0,0,c.width,c.height)}
+  else{const big=Math.max(1,Math.floor(512/Math.max(curC.width,curC.height)));c=mk(curC.width*big,curC.height*big);const x=c.getContext('2d');x.imageSmoothingEnabled=false;x.fillStyle='#FF00FF';x.fillRect(0,0,c.width,c.height);x.drawImage(curC,0,0,c.width,c.height)}
+  return c}
+const curSrcUrl=()=>curSrcCanvas().toDataURL('image/png');
+const chatSys=()=>`You are the art director for a pixel-art game asset pipeline, looking at the current sprite with the artist. Style bible: ${P().style}\nTalk it through briefly, in 2 to 4 sentences: say what you notice is off and, only if truly needed, ask one question. When a concrete fix is agreed or obvious, end your message with one separate line starting with EDIT: followed by one precise instruction for an image editor that describes only the change. Do not write an EDIT: line until there is a concrete change. Never suggest recoloring, and never mention or add blue, teal or cyan unless the artist asks for it; fix shape, pose and detail only.`;
+function chatAdd(who,text){const d=document.createElement('div');d.className='msgb '+who;d.textContent=text;$('chatLog').appendChild(d);$('chatLog').scrollTop=1e9}
+function resetChat(){lasso=[];if(lassoOn)drawLasso();chat=[];pending='';rawHist=[];chatNote='';$('chatLog').innerHTML='';$('chatApply').hidden=true}
+async function geminiChat(contents){
+  const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent',{method:'POST',
+    headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},body:JSON.stringify({systemInstruction:{parts:[{text:chatSys()}]},contents})});
+  const j=await r.json();if(!r.ok)throw new Error(j.error?.message||('HTTP '+r.status));
+  return (j.candidates?.[0]?.content?.parts||[]).map(p=>p.text||'').join('').trim();
+}
+$('chatSend').onclick=async()=>{
+  const q=$('chatIn').value.trim();if(!q)return;
+  if(!cfg.key)return msg('Add your Gemini API key in the sidebar.');if(!curC)return msg('Generate an image first.');
+  $('chatIn').value='';chatAdd('you',q);$('chatSend').disabled=true;
+  try{
+    const parts=[{text:chatNote+q}];
+    if(!chat.length||chatNote)parts.push(inl(curSrcUrl())); // send the image first time and after each edit
+    chatNote='';
+    const turn={role:'user',parts},reply=await geminiChat([...chat,turn]);
+    chat.push(turn,{role:'model',parts:[{text:reply}]});chatAdd('ai',reply);
+    const m=/^\s*EDIT:\s*(.+)$/m.exec(reply);pending=m?m[1].trim():'';$('chatApply').hidden=!pending;
+  }catch(e){chatAdd('sys','Error: '+e.message)}
+  $('chatSend').disabled=false;
+};
+async function applyEdit(text){
+  if(!curC)return msg('Generate an image first.');if(!cfg.key)return msg('Add your Gemini API key in the sidebar.');
+  $('chatApply').disabled=$('chatDirect').disabled=true;msg('Applying the edit…');
+  try{
+    const prompt=`${STY()}\n\nThe attached image is the current asset. Make exactly this change and nothing else: ${text}. Keep everything else identical: the same character or object, armor, proportions, pose, camera angle, size and position in the frame. Keep every existing color exactly as it is in the attached image, with the same brightness. Do not add or shift any color toward blue, teal or cyan unless the change itself asks for it. Flat neutral lighting, no colored rim light. ${BG}`;
+    const base=curSrcCanvas(),mask=lassoMask(base.width,base.height);
+    let img=await loadImg(await gemini(mask?prompt+' The second attached image is a mask: change ONLY the white region and keep the black region exactly as it is.':prompt,base.toDataURL('image/png'),mask&&mask.toDataURL('image/png')));
+    if(mask)img=lassoBlend(base,img,mask);
+    rawHist.push({raw,c:curC});raw=img;photoSrc=null;render();lasso=[];drawLasso();
+    chatNote='(The edit "'+text+'" was applied and the attached image is the new result.) ';pending='';$('chatApply').hidden=true;
+    chatAdd('sys','Edit applied. Tell me what still looks off, or undo it.');msg('Edit applied. Undo is available.');
+  }catch(e){msg('Error: '+e.message)}
+  $('chatApply').disabled=$('chatDirect').disabled=false;
+}
+$('chatApply').onclick=()=>pending&&applyEdit(pending);
+$('chatDirect').onclick=()=>{const q=$('chatIn').value.trim();if(!q)return msg('Type the change you want first.');$('chatIn').value='';chatAdd('you','Edit now: '+q);applyEdit(q)};
+$('chatUndo').onclick=()=>{const h=rawHist.pop();if(!h)return msg('Nothing to undo.');if(h.raw){photoSrc=null;raw=h.raw;render()}else{raw=null;photoSrc=null;showAsset(h.c)}chatAdd('sys','Last edit undone.')};
+
+/* ---------- Automatic color control ---------- */
+const BG='Background: one flat solid #FF00FF magenta fill, no shadow, no text.';
+const STY=()=>`${P().style}${PAL()?`\nPalette, use only these colors: ${PAL()}.`:''}`;
+const PAL=()=>(P().facPal&&P().facPal[dest.faction])||P().pal||'';
+function subjectCanvas(img){ // transparent background: flood from the border through teal/blue pixels
+  const k=Math.min(1,512/Math.max(img.width,img.height)),w=Math.round(img.width*k),h=Math.round(img.height*k),c=mk(w,h),x=c.getContext('2d');
+  x.drawImage(img,0,0,w,h);const d=x.getImageData(0,0,w,h),a=d.data,seen=new Uint8Array(w*h),st=[];
+  const bg=p=>{const i=p*4,r=a[i],g=a[i+1],b=a[i+2];return b>=r+12&&g>=r+6&&Math.max(g,b)-r>=18};
+  for(let i=0;i<w;i++){st.push(i,(h-1)*w+i)}for(let j=0;j<h;j++){st.push(j*w,j*w+w-1)}
+  while(st.length){const p=st.pop();if(seen[p]||!bg(p))continue;seen[p]=1;const x0=p%w,y0=(p-x0)/w;
+    if(x0>0)st.push(p-1);if(x0<w-1)st.push(p+1);if(y0>0)st.push(p-w);if(y0<h-1)st.push(p+w)}
+  for(let p=0;p<w*h;p++)if(seen[p])a[p*4+3]=0;x.putImageData(d,0,0);return c;
+}
+const refCache=new Map();
+async function cleanRef(u){if(refCache.has(u))return refCache.get(u);
+  const s=subjectCanvas(await loadImg(u)),o=mk(s.width,s.height),x=o.getContext('2d');x.fillStyle='#FF00FF';x.fillRect(0,0,o.width,o.height);x.drawImage(s,0,0);
+  const r=o.toDataURL('image/png');refCache.set(u,r);return r}
+const toLab=(r,g,b)=>{const f=v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4},R=f(r),G=f(g),B=f(b),
+  X=(.4124*R+.3576*G+.1805*B)/.95047,Y=.2126*R+.7152*G+.0722*B,Z=(.0193*R+.1192*G+.9505*B)/1.08883,t=v=>v>.008856?Math.cbrt(v):7.787*v+16/116;
+  return[116*t(Y)-16,500*(t(X)-t(Y)),200*(t(Y)-t(Z))]};
+function snapPalette(c,hexList){ // nearest palette color in Lab, brightness weighted so values stay put
+  const pal=hexList.split(',').map(s=>s.trim()).filter(s=>/^#[0-9a-f]{6}$/i.test(s)).map(h=>{const v=[1,3,5].map(i=>parseInt(h.substr(i,2),16));return{v,l:toLab(...v)}});
+  if(!pal.length)return;
+  const x=c.getContext('2d'),d=x.getImageData(0,0,c.width,c.height),a=d.data,memo=new Map();
+  for(let i=0;i<a.length;i+=4){if(!a[i+3])continue;const key=a[i]<<16|a[i+1]<<8|a[i+2];let b=memo.get(key);
+    if(b===undefined){const l=toLab(a[i],a[i+1],a[i+2]);let bd=1e9;b=0;
+      pal.forEach((p,k)=>{const dc=Math.hypot(l[1],l[2])-Math.hypot(p.l[1],p.l[2]),dab=(p.l[1]-l[1])**2+(p.l[2]-l[2])**2,dh=Math.max(0,dab-dc*dc),e=1.6*(p.l[0]-l[0])**2+dc*dc+2.5*dh;if(e<bd){bd=e;b=k}});memo.set(key,b)}
+    a[i]=pal[b].v[0];a[i+1]=pal[b].v[1];a[i+2]=pal[b].v[2]}
+  x.putImageData(d,0,0);
+}
+const lum=(r,g,b)=>.2126*r+.7152*g+.0722*b;
+const labToRgb=(L,A,B)=>{const fy=(L+16)/116,fx=fy+A/500,fz=fy-B/200,inv=t=>t**3>.008856?t**3:(t-16/116)/7.787,
+  X=inv(fx)*.95047,Y=inv(fy),Z=inv(fz)*1.08883,lin=[3.2406*X-1.5372*Y-.4986*Z,-.9689*X+1.8758*Y+.0415*Z,.0557*X-.204*Y+1.057*Z];
+  return lin.map(v=>{v=Math.max(0,Math.min(1,v));return Math.round(255*(v<=.0031308?12.92*v:1.055*v**(1/2.4)-.055))})};
+function castOf(c){ // average Lab tint (a*, b*) of the low-chroma pixels: the "cast" of an image
+  const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let A=0,B=0,n=0,op=0;
+  for(let i=0;i<d.length;i+=4){if(d[i+3]<128)continue;op++;const l=toLab(d[i],d[i+1],d[i+2]);if(l[0]<8||l[0]>97||Math.hypot(l[1],l[2])>18)continue;A+=l[1];B+=l[2];n++}
+  return n>=Math.max(12,op*.03)?[A/n,B/n]:null}
+function paletteCast(hexList){const v=(hexList||'').split(',').map(s=>s.trim()).filter(s=>/^#[0-9a-f]{6}$/i.test(s))
+  .map(h=>toLab(...[1,3,5].map(i=>parseInt(h.substr(i,2),16)))).filter(l=>Math.hypot(l[1],l[2])<=18);
+  return v.length?[v.reduce((s,l)=>s+l[1],0)/v.length,v.reduce((s,l)=>s+l[2],0)/v.length]:[0,0]}
+function neutralize(c){ // fix the drift toward blue: pull the image's neutral tint to the target (tone anchor, else the palette's neutrals)
+  const cur=castOf(c);if(!cur)return null;
+  const tgt=(P().cast)||paletteCast(PAL());let dA=tgt[0]-cur[0],dB=tgt[1]-cur[1];const m=Math.hypot(dA,dB);
+  if(m<1.5)return null;if(m>15){dA*=15/m;dB*=15/m}
+  const x=c.getContext('2d'),d=x.getImageData(0,0,c.width,c.height),a=d.data,memo=new Map();
+  for(let i=0;i<a.length;i+=4){if(!a[i+3])continue;const key=a[i]<<16|a[i+1]<<8|a[i+2];let o=memo.get(key);
+    if(!o){const l=toLab(a[i],a[i+1],a[i+2]),ch=Math.hypot(l[1],l[2]),w=ch<=25?1:ch>=50?0:(50-ch)/25; // saturated colors (team colors, gold) stay put
+      o=w?labToRgb(l[0],l[1]+dA*w,l[2]+dB*w):[a[i],a[i+1],a[i+2]];memo.set(key,o)}
+    a[i]=o[0];a[i+1]=o[1];a[i+2]=o[2]}
+  x.putImageData(d,0,0);return[+dA.toFixed(2),+dB.toFixed(2)];
+}
+function lumCdf(c){const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,h=new Array(256).fill(0);let n=0,s=0;
+  for(let i=0;i<d.length;i+=4)if(d[i+3]){h[Math.round(lum(d[i],d[i+1],d[i+2]))]++;n++}return n?h.map(v=>(s+=v)/n):null}
+function toneMatch(c,tgt){ // match the brightness distribution to the anchor sprite, keeping hue
+  const src=lumCdf(c);if(!src||!tgt)return;const map=[];let j=0;
+  for(let i=0;i<256;i++){while(j<255&&tgt[j]<src[i])j++;map[i]=j}
+  const x=c.getContext('2d'),d=x.getImageData(0,0,c.width,c.height),a=d.data;
+  for(let i=0;i<a.length;i+=4){if(!a[i+3])continue;const l=lum(a[i],a[i+1],a[i+2])||1,k=Math.min(3,map[Math.round(l)]/l,255/(Math.max(a[i],a[i+1],a[i+2])||1));
+    a[i]=Math.min(255,a[i]*k);a[i+1]=Math.min(255,a[i+1]*k);a[i+2]=Math.min(255,a[i+2]*k)}
+  x.putImageData(d,0,0);
+}
+$('setAnchor').onclick=()=>{if(!curC)return msg('Generate or pick an asset first.');P().tone=lumCdf(curC);P().cast=castOf(curC);saveProj();msg('Tone anchor set. Every new asset now matches this brightness.')};
+$('lockPal').onclick=()=>{if(!curC)return msg('Generate or pick an asset first.');P().facPal=P().facPal||{};
+  P().facPal[dest.faction]=extractPalette(curC,+$('ncol').value).join(',');saveProj();msg(`Palette for ${dest.faction} locked from this asset. Later assets for that faction snap to it.`)};
+$('batchGo').onclick=async()=>{const L=$('batchIn').value.split('\n').map(s=>s.trim()).filter(Boolean);if(!L.length)return msg('Add one subject per line first.');
+  $('batchGo').disabled=true;let ok=0;
+  for(const [i,t] of L.entries()){prog.det(ok,L.length);$('desc').value=t;$('dName').value='';showPath();const prev=raw;await doGen();if(raw===prev){msg(`Stopped at ${i+1} of ${L.length}. ${ok} saved.`);break}
+    await savePng(curC,'',nameOf());ok++;msg(`Saved ${ok} of ${L.length}…`)}
+  $('batchGo').disabled=false;if(ok===L.length)msg(`Batch done: ${ok} assets saved to ${destLabel('')}.`)};
+
+/* ---------- TAB 2: Animation studio ---------- */
+let aSrc=null,aFrames={},aCell=[0,0],aSheet=null,aTimer=null;
+const ORDER=['idle','move','attack','block','shoot'],LOOP={idle:true,move:true,attack:false,block:false,shoot:false};
+const E=t=>t*t*(3-2*t),L=(a,b,t)=>a+(b-a)*t;
+// t runs 0..1, u = sprite width / 16. lean = sideways shift of the head (the body bends at the hips, feet stay planted); step = leg swing -1..1
+const POSES={
+  idle:(t,u)=>{const s=Math.sin(t*2*Math.PI);return{dx:0,dy:0,sx:1-.012*s,sy:1+.025*s,lean:.2*u*s}},
+  move:(t,u)=>{const s=Math.sin(t*2*Math.PI);return{dx:0,dy:-Math.abs(s)*.3*u,sx:1,sy:1,lean:.5*u,step:s}},
+  attack:(t,u)=>{
+    if(t<.3){const k=E(t/.3);return{dx:-.3*u*k,dy:0,sx:1,sy:1-.03*k,lean:-1.0*u*k}}
+    if(t<.5){const k=E((t-.3)/.2);return{dx:L(-.3*u,.9*u,k),dy:0,sx:1,sy:.97,lean:L(-1.0*u,1.8*u,k),fx:k>.5?'slash':''}}
+    if(t<.65)return{dx:.9*u,dy:0,sx:1,sy:.97,lean:1.8*u,fx:'slash',tint:'#F0F2F5',ta:.5};
+    const k=E((t-.65)/.35);return{dx:L(.9*u,0,k),dy:0,sx:1,sy:L(.97,1,k),lean:L(1.8*u,0,k)}},
+  block:(t,u)=>{
+    if(t<.25){const k=E(t/.25);return{dx:0,dy:0,sx:1,sy:1-.07*k,lean:-.9*u*k,fx:k>.5?'shield':''}}
+    if(t<.75){const hit=t>.45&&t<.6,j=Math.floor(t*16)%2?.25*u:-.25*u;
+      return{dx:hit?j:0,dy:0,sx:1,sy:.93,lean:hit?-1.6*u:-.9*u,fx:hit?'hit':'shield',tint:hit?'#F0F2F5':undefined,ta:.3}}
+    const k=E((t-.75)/.25);return{dx:0,dy:0,sx:1,sy:L(.93,1,k),lean:L(-.9*u,0,k),fx:k<.4?'shield':''}},
+  shoot:(t,u)=>{
+    if(t<.2){const k=E(t/.2);return{dx:0,dy:0,sx:1,sy:1,lean:.7*u*k}}
+    if(t<.4){const k=(t-.2)/.2;return{dx:L(0,-.4*u,E(k)),dy:0,sx:1,sy:1,lean:L(.7*u,-1.1*u,E(k)),fx:'muzzle',tint:k<.5?'#F0F2F5':undefined,ta:.35}}
+    const k=E((t-.4)/.6);return{dx:L(-.4*u,0,k),dy:0,sx:1,sy:1,lean:L(-1.1*u,0,k)}}
+};
+const bbCache=new WeakMap();
+function bbox(c){ // opaque bounds of a sprite, cached
+  let b=bbCache.get(c);if(b)return b;
+  const w=c.width,h=c.height,d=c.getContext('2d').getImageData(0,0,w,h).data;let t=h,bt=-1,l=w,r=-1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(d[(y*w+x)*4+3]){if(y<t)t=y;if(y>bt)bt=y;if(x<l)l=x;if(x>r)r=x}
+  b=bt<0?{t:0,b:h-1,l:0,r:w-1}:{t,b:bt,l,r};bbCache.set(c,b);return b;
+}
+function warp(src,p){ // bend the upper body at the hips and swing the legs, feet stay on the ground
+  const w=src.width,h=src.height,m=Math.max(2,Math.round(w*.08)),o=mk(w+2*m,h+2*m),x=o.getContext('2d');x.imageSmoothingEnabled=false;
+  const g=RIG,b=bbox(src),hip=Math.round(b.t+(b.b-b.t)*(g?g.hip:.55)),lean=p.lean||0,st=p.step||0,u=w/16,arm=g&&g.arm&&src===g.src;
+  if(arm&&!g.part)mkArm(g);const S=arm?g.body:src;
+  for(let y=0;y<hip;y++){const k=Math.min(1,(hip-y)/Math.max(1,hip-b.t));x.drawImage(S,0,y,w,1,m+Math.round(lean*k),m+y,w,1)}
+  const cx=Math.max(0,Math.min(w,Math.round(b.l+(b.r-b.l)*(g?g.split:.5)))),legH=h-hip,lift=.45*u,swing=.5*u;
+  if(legH>0&&cx>0)x.drawImage(S,0,hip,cx,legH,m+Math.round(st*swing),m+hip-Math.round(Math.max(0,st)*lift),cx,legH);
+  if(legH>0&&w-cx>0)x.drawImage(S,cx,hip,w-cx,legH,m+cx-Math.round(st*swing),m+hip-Math.round(Math.max(0,-st)*lift),w-cx,legH);
+  if(arm){const ang=p.step!==undefined?-p.step*.5:lean/u*.5,pv=g.arm.pivot,k=Math.min(1,Math.max(0,(hip-pv[1]*h)/Math.max(1,hip-b.t)));
+    x.save();x.translate(m+pv[0]*w+Math.round(lean*k),m+pv[1]*h);x.rotate(ang);x.drawImage(g.part,-pv[0]*w,-pv[1]*h);x.restore()}
+  return o;
+}
+function splitSprites(src,gap){ // find separate sprites in one image; returns same-size cells, reading order
+  const w=src.width,h=src.height,c=mk(w,h);c.getContext('2d').drawImage(src,0,0);
+  let d=c.getContext('2d').getImageData(0,0,w,h),see=0;
+  for(let i=3;i<d.data.length;i+=4)if(d.data[i]<250)see++;
+  if(see<w*h*.02){keyOut(c,60);d=c.getContext('2d').getImageData(0,0,w,h)} // no transparency: key out the background color
+  const a=d.data,lab=new Uint8Array(w*h),st=[];let list=[];
+  for(let s=0;s<w*h;s++){
+    if(lab[s]||a[s*4+3]<20)continue;
+    const b=[w,h,0,0,0];lab[s]=1;st.push(s);
+    while(st.length){const q=st.pop(),x=q%w,y=(q-x)/w;
+      if(x<b[0])b[0]=x;if(y<b[1])b[1]=y;if(x>b[2])b[2]=x;if(y>b[3])b[3]=y;b[4]++;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=w||ny>=h)continue;
+        const n=ny*w+nx;if(!lab[n]&&a[n*4+3]>=20){lab[n]=1;st.push(n)}}}
+    list.push(b);
+  }
+  for(let again=true;again;){again=false; // merge pieces that sit within the gap of each other
+    outer:for(let i=0;i<list.length;i++)for(let j=i+1;j<list.length;j++){const A=list[i],B=list[j];
+      if(A[0]-gap<=B[2]&&B[0]-gap<=A[2]&&A[1]-gap<=B[3]&&B[1]-gap<=A[3]){
+        list[i]=[Math.min(A[0],B[0]),Math.min(A[1],B[1]),Math.max(A[2],B[2]),Math.max(A[3],B[3]),A[4]+B[4]];list.splice(j,1);again=true;break outer}}}
+  const big=Math.max(1,...list.map(b=>b[4]));
+  list=list.filter(b=>b[4]>=big*.03&&b[4]>=6); // drop stray specks
+  if(!list.length)return[];
+  const hs=list.map(b=>b[3]-b[1]+1).sort((p,q)=>p-q),mh=hs[hs.length>>1],rows=[];
+  list.sort((p,q)=>p[1]-q[1]).forEach(b=>{const yc=(b[1]+b[3])/2;let r=rows.find(r=>Math.abs(r.yc-yc)<mh*.6);if(!r){r={yc,items:[]};rows.push(r)}r.items.push(b)});
+  list=rows.sort((p,q)=>p.yc-q.yc).flatMap(r=>r.items.sort((p,q)=>p[0]-q[0]));
+  const W=Math.max(...list.map(b=>b[2]-b[0]+1))+2,H=Math.max(...list.map(b=>b[3]-b[1]+1))+2;
+  return list.map(b=>{const bw=b[2]-b[0]+1,bh=b[3]-b[1]+1,o=mk(W,H),x=o.getContext('2d');x.imageSmoothingEnabled=false;
+    x.drawImage(c,b[0],b[1],bw,bh,(W-bw)>>1,H-1-bh,bw,bh);return o}); // feet-aligned, centered
+}
+let splitSrc=null,splitList=[];
+function loadSource(c){splitSrc=c;doSplit(true)}
+function doSplit(first){
+  const g=$('splitGap').value,gap=g==='auto'?Math.max(1,Math.round(.03*Math.min(splitSrc.width,splitSrc.height))):+g;
+  splitList=splitSprites(splitSrc,gap);
+  const box=$('splitLib');box.innerHTML='';
+  if(splitList.length<2&&first){$('splitPanel').hidden=true;setASrc(splitSrc);return msg('Sprite loaded into the animation studio.')}
+  $('splitPanel').hidden=false;
+  $('splitInfo').textContent=splitList.length?`Found ${splitList.length} sprite${splitList.length>1?'s':''}, all on equal-size cells with feet aligned. Tap one to animate it.`:'No sprites found in this image.';
+  splitList.forEach(s=>{const t=clone(s);t.onclick=()=>{[...box.children].forEach(k=>k.style.borderColor='');t.style.borderColor='#f3c623';setASrc(s);msg('Sprite loaded into the animation studio.')};box.appendChild(t)});
+  if(first)msg(`Found ${splitList.length} sprites in that image. Tap the one to animate.`);
+}
+$('splitGap').onchange=()=>splitSrc&&doSplit(false);
+$('splitLibAll').onclick=async()=>{for(const [i,s] of splitList.entries())await savePng(s,'',aTag()+'_'+(i+1));msg(`${splitList.length} sprites saved to ${destLabel('')}.`)};
+let aAI={},aStore={},aDir='front',aDirs=[],aAll={};
+const DIRS=['front','back','left','right'];
+const DIRTXT={back:'seen from directly behind, facing away from the camera, with the back of the armor and any cape clearly visible',left:'in side view, facing left of the frame',right:'in side view, facing right of the frame'};
+const DIRNOTE={front:'',back:'The character is seen from behind, facing away from the camera. ',left:'The character faces left in side view. ',right:'The character faces right in side view. '};
+const flipC=c=>{const f=mk(c.width,c.height),x=f.getContext('2d');x.translate(c.width,0);x.scale(-1,1);x.drawImage(c,0,0);return f};
+function magentaRef(c){const big=Math.max(1,Math.floor(512/Math.max(c.width,c.height))),r=mk(c.width*big,c.height*big),x=r.getContext('2d');
+  x.imageSmoothingEnabled=false;x.fillStyle='#FF00FF';x.fillRect(0,0,r.width,r.height);x.drawImage(c,0,0,r.width,r.height);return r.toDataURL('image/png')}
+function withDir(d,fn){const s=[aSrc,aAI,aDir];aSrc=aStore[d].src;aAI=aStore[d].ai;aDir=d;try{return fn()}finally{[aSrc,aAI,aDir]=s}}
+function useDir(d){aDir=d;aSrc=aStore[d].src;aAI=aStore[d].ai;buildAnims()}
+function setASrc(c){RIG=null;aStore={front:{src:clone(c),ai:{}}};$('aDirSel').value='front';useDir('front')}
+async function genDir(){
+  const d=$('aDirSel').value;
+  if(!aStore.front)return msg('Load a sprite first.');
+  if(aStore[d])return useDir(d);
+  const opp={left:'right',right:'left'}[d];
+  if(opp&&aStore[opp]){const o=aStore[opp];
+    aStore[d]={src:flipC(o.src),ai:Object.fromEntries(Object.entries(o.ai).map(([k,v])=>[k,v.map(flipC)]))};
+    useDir(d);return msg(`${d} view mirrored from ${opp}, including any AI poses.`)}
+  if(!cfg.key)return msg('Add your Gemini API key in the sidebar.');
+  const F=aStore.front.src;$('aDirGen').disabled=true;msg(`Drawing the ${d} view…`);
+  try{
+    const prompt=`${STY()}\n\nThe attached image is the reference character. Draw the SAME character, with identical armor, colors, proportions and weapon, ${DIRTXT[d]}, standing in the same neutral ready pose. Keep the same size, position in the frame and camera height as the reference. ${BG}`;
+    aStore[d]={src:processImg(await loadImg(await gemini(prompt,magentaRef(F))),Math.max(F.width,F.height),+$('tol').value),ai:{}};
+    useDir(d);msg(`${d} view added. Now use the AI buttons to pose it.`);
+  }catch(e){msg('Error: '+e.message)}
+  $('aDirGen').disabled=false;
+}
+$('aDirSel').onchange=e=>{const d=e.target.value;if(aStore[d])useDir(d);else msg('No '+d+' view yet. Tap "Generate this direction" first.')};
+$('aDirGen').onclick=genDir;
+const gapOf=im=>Math.max(1,Math.round(.02*Math.min(im.width,im.height)));
+async function sheetCells(prompt,refUrl,n,base,fb,th){ // one generated sheet in, n matching sprites out
+  const img=await loadImg(await gemini(prompt,refUrl)),list=splitSprites(img,gapOf(img));
+  if(list.length!==n)throw new Error(`Found ${list.length} figures instead of ${n}. Tap again.`);
+  return{img,cells:list.map(c=>fitTo(c,base,fb,th))};
+}
+function fitTo(cell,F,fb,th){ // scale to the front's height and stand on its ground line, then match tone and palette
+  const b=bbox(cell),cw=b.r-b.l+1,ch=b.b-b.t+1,k=Math.min(th/ch,F.width/cw),w=Math.max(1,Math.round(cw*k)),h=Math.max(1,Math.round(ch*k));
+  const t=downMedian(cell,b.l,b.t,cw,ch,w,h);
+  if(!$('wb')||$('wb').checked)neutralize(t);toneMatch(t,P().tone);snapPalette(t,PAL());
+  const o=mk(F.width,F.height);o.getContext('2d').drawImage(t,Math.round((F.width-w)/2),fb.b+1-h);return o;
+}
+$('aSheet4').onclick=async()=>{
+  if(!aStore.front)return msg('Load a sprite first.');if(!cfg.key)return msg('Add your Gemini API key in the sidebar.');
+  const F=aStore.front.src,fb=bbox(F),th=fb.b-fb.t+1;
+  msg('Drawing the front / back / left / right sheet (1 image)…');
+  try{
+    const prompt=`${STY()}\n\nThe attached image is the reference character. Draw ONE image containing a 2 by 2 turnaround sheet of the SAME character, with identical armor, colors, proportions and weapon, standing in the same neutral ready pose in all four. Top left: front view exactly as the reference. Top right: seen from directly behind, facing away from the camera. Bottom left: side view facing left of the frame. Bottom right: side view facing right of the frame. The four figures are the same size, each stands on the same ground line as its row neighbour, and they are separated by wide empty space. No labels, no text, no borders. Background: one flat solid #FF00FF magenta fill, no shadow.`;
+    const {cells}=await sheetCells(prompt,magentaRef(F),4,F,fb,th);
+    ['back','left','right'].forEach((d,i)=>aStore[d]={src:cells[i+1],ai:{}});
+    $('aDirSel').value='front';useDir('front');msg('Back, left and right added from one sheet. Pick a direction to preview or pose it.');
+  }catch(e){msg('Error: '+e.message)}
+};
+let teamHue=null;
+const rgb2hsv=(r,g,b)=>{r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),d=mx-Math.min(r,g,b);let h=0;if(d)h=mx===r?((g-b)/d+6)%6:mx===g?(b-r)/d+2:(r-g)/d+4;return[h*60,mx?d/mx:0,mx]};
+const hsv2rgb=(h,s,v)=>{h/=60;const f=n=>{const k=(n+h)%6;return Math.round(255*(v-v*s*Math.max(0,Math.min(k,4-k,1))))};return[f(5),f(3),f(1)]};
+$('out').onclick=e=>{if(!curC)return;const r=$('out').getBoundingClientRect(),u=Math.floor((e.clientX-r.left)/r.width*curC.width),v=Math.floor((e.clientY-r.top)/r.height*curC.height),p=curC.getContext('2d').getImageData(u,v,1,1).data;
+  if(!p[3])return msg('Tap on the character, not the background.');const [h,sat]=rgb2hsv(p[0],p[1],p[2]);if(sat<.2)return msg('That color is too gray to recolor. Tap a more colorful part.');
+  teamHue=h;$('teamTxt').textContent='Picked a color at '+Math.round(h)+' degrees of hue.';msg('Accent color picked. Now Make red team or Make blue team.')};
+function recolor(c,tgt){const o=clone(c),x=o.getContext('2d'),d=x.getImageData(0,0,o.width,o.height),a=d.data;
+  for(let i=0;i<a.length;i+=4){if(!a[i+3])continue;const [h,sat,v]=rgb2hsv(a[i],a[i+1],a[i+2]);let dh=Math.abs(h-teamHue);dh=Math.min(dh,360-dh);
+    if(sat>=.2&&v>.12&&dh<30){const q=hsv2rgb(tgt,sat,v);a[i]=q[0];a[i+1]=q[1];a[i+2]=q[2]}}
+  x.putImageData(d,0,0);return o}
+async function teamMake(name,tgt){if(!curC)return msg('Generate or pick an asset first.');if(teamHue==null)return msg('Tap the accent color on the preview first.');
+  const a=assetName();await savePng(recolor(curC,tgt),'',a+'_'+name);
+  if(d8){const J=new Blob([JSON.stringify(d8.anim.meta,null,2)],{type:'application/json'});
+    await saveFiles('',a+'_8dir_'+name,[{ext:'png',blob:await toBlob(recolor(d8.sheet,tgt))}]);
+    await saveFiles('',a+'_anims8_'+name,[{ext:'png',blob:await toBlob(recolor(d8.anim.sheet,tgt))},{ext:'json',blob:J}])}
+  msg(`Saved the ${name} team versions to ${destLabel('')}.`)}
+$('teamRed').onclick=()=>teamMake('red',2);$('teamBlue').onclick=()=>teamMake('blue',215);
+$('godotBtn').onclick=async()=>{if(!d8)return msg('Build the sheet first.');
+  const a=assetName(),m=d8.anim.meta,p=$('godotPath').value.trim().replace(/\/?$/,'/')+a+'_anims8.png';let sub='',an=[],id=0;
+  m.rows.forEach(r=>{const fr=[];for(let i=0;i<r.frames;i++){id++;sub+=`[sub_resource type="AtlasTexture" id="t${id}"]\natlas = ExtResource("1")\nregion = Rect2(${i*m.cell[0]}, ${r.row*m.cell[1]}, ${m.cell[0]}, ${m.cell[1]})\n\n`;fr.push(`{\n"duration": 1.0,\n"texture": SubResource("t${id}")\n}`)}
+    an.push(`{\n"frames": [${fr.join(', ')}],\n"loop": ${r.loop},\n"name": &"${r.animation}_${r.direction.toLowerCase()}",\n"speed": ${m.fps}.0\n}`)});
+  const txt=`[gd_resource type="SpriteFrames" load_steps=${id+2} format=3]\n\n[ext_resource type="Texture2D" path="${p}" id="1"]\n\n${sub}[resource]\nanimations = [${an.join(', ')}]\n`;
+  const n=await saveFiles('',a+'_frames',[{ext:'tres',blob:new Blob([txt],{type:'text/plain'})}]);msg(`Saved ${n}.tres. Put ${a}_anims8.png at ${p} in your Godot project, then open the .tres.`)};
+let d8=null;
+const pick8=([S,SE,E,NE,N])=>({S,SW:flipC(SE),W:flipC(E),NW:flipC(NE),N,NE,E,SE});
+function imgUrl(im){const k=Math.min(1,768/Math.max(im.width,im.height)),c=mk(Math.round(im.width*k),Math.round(im.height*k));c.getContext('2d').drawImage(im,0,0,c.width,c.height);return c.toDataURL('image/png')}
+async function stepSheet(sheetImg,leg,base,fb,th){ // the same five headings mid-stride, with one foot forward
+  const prompt=`${STY()}\n\nThe attached image shows five figures of one character at five headings. Redraw this exact sheet with the same five figures in the same positions, headings, sizes and layout, but with every figure caught ${leg}. Only the limbs and the weapon change. Identical armor, colors, proportions and weapon, no extra limbs, no motion blur. ${BG}`;
+  return (await sheetCells(prompt,imgUrl(sheetImg),5,base,fb,th)).cells;
+}
+function frames8(sp,steps,atk){ // built-in motion (no image cost) for every heading: idle, move, attack, block, shoot
+  const N=+$('aN').value,F=sp.S,padX=Math.round(F.width*.45),padY=Math.round(F.height*.1),cw=F.width+padX*2,ch=F.height+padY*2,
+    sheet=mk(cw*N,ch*8*ORDER.length),x=sheet.getContext('2d'),keep=[aSrc,aDir];
+  try{D8_ORDER.forEach((h,di)=>{aSrc=sp[h];aDir=h==='N'?'back':h==='S'?'S':'front';const flip=h==='SW'||h==='W'||h==='NW';
+    ORDER.forEach((n,r)=>{for(let i=0;i<N;i++){let f;
+      if((n==='move'&&steps)||(n==='attack'&&atk)){const seq=n==='move'?[sp[h],steps[0][h],sp[h],steps[1][h]]:[sp[h],atk[h],atk[h],sp[h]],k=seq[Math.min(3,Math.floor(i*4/N))];f=mk(cw,ch);f.getContext('2d').drawImage(k,Math.round((cw-k.width)/2),ch-padY-k.height)}
+      else f=frame(n,LOOP[n]?i/N:i/(N-1),cw,ch,padY,flip);
+      x.drawImage(f,i*cw,(di*ORDER.length+r)*ch)}})})}
+  finally{[aSrc,aDir]=keep}
+  const meta={project:cur,stepPoses:!!steps,attackPose:!!atk,cell:[cw,ch],fps:+$('aFps').value,hframes:N,vframes:8*ORDER.length,
+    rows:D8_ORDER.flatMap((h,di)=>ORDER.map((n,r)=>({direction:h,animation:n,row:di*ORDER.length+r,frames:N,loop:LOOP[n]})))};
+  return{sheet,meta};
+}
+async function d8SaveAll(){
+  if(!d8)return msg('Generate the 8 directions first.');
+  const J=o=>new Blob([JSON.stringify(o,null,2)],{type:'application/json'}),a=assetName();
+  const m1={project:cur,cell:[d8.W,d8.H],frames:8,order:D8_ORDER,mirrored:['SW','W','NW']};
+  const n1=await saveFiles('',a+'_8dir',[{ext:'png',blob:await toBlob(d8.sheet)},{ext:'json',blob:J(m1)}]);
+  const n2=await saveFiles('',a+'_anims8',[{ext:'png',blob:await toBlob(d8.anim.sheet)},{ext:'json',blob:J(d8.anim.meta)}]);
+  msg(`Saved ${n1} (8 directions) and ${n2} (all 8 directions, idle, move, attack, block, shoot) to ${destLabel('')}.${d8.note||''}`);
+}
+const D8_ORDER=['S','SW','W','NW','N','NE','E','SE'];
+let d8Timer=null;
+fill($('d8Dir'),D8_ORDER.map(x=>[x,x]),'SE');fill($('d8Anim'),ORDER.map(x=>[x,x]),'move');
+function gifBytes(frames,w,h,delay){ // minimal GIF89a writer: shared palette, index 0 transparent, no dictionary growth so it stays simple and safe
+  const pal=[[0,0,0]],map=new Map();
+  const idx=frames.map(d=>{const o=new Uint8Array(w*h);for(let i=0,p=0;i<d.length;i+=4,p++){if(d[i+3]<128)continue;const key=d[i]<<16|d[i+1]<<8|d[i+2];let k=map.get(key);
+    if(k===undefined){if(pal.length<256){k=pal.length;pal.push([d[i],d[i+1],d[i+2]])}else{let bd=1e9;k=1;for(let q=1;q<pal.length;q++){const e=(pal[q][0]-d[i])**2+(pal[q][1]-d[i+1])**2+(pal[q][2]-d[i+2])**2;if(e<bd){bd=e;k=q}}}map.set(key,k)}o[p]=k}return o});
+  let bits=3;while((1<<bits)<pal.length)bits++;
+  const u16=v=>[v&255,v>>8&255],out=[...'GIF89a'].map(c=>c.charCodeAt(0));
+  out.push(...u16(w),...u16(h),0x80|(bits-1),0,0);
+  for(let i=0;i<(1<<bits);i++)out.push(...(pal[i]||[0,0,0]));
+  out.push(0x21,0xFF,11,...[...'NETSCAPE2.0'].map(c=>c.charCodeAt(0)),3,1,0,0,0);
+  idx.forEach(o=>{out.push(0x21,0xF9,4,0x09,...u16(delay),0,0,0x2C,0,0,0,0,...u16(w),...u16(h),0,bits);
+    const clear=1<<bits,eoi=clear+1,size=bits+1,lim=clear-4,bytes=[];let buf=0,nb=0,n=0;
+    const emit=c=>{buf|=c<<nb;nb+=size;while(nb>=8){bytes.push(buf&255);buf>>=8;nb-=8}};
+    emit(clear);for(let i=0;i<o.length;i++){emit(o[i]);if(++n>=lim){emit(clear);n=0}}emit(eoi);if(nb>0)bytes.push(buf&255);
+    for(let i=0;i<bytes.length;i+=255){const ch=bytes.slice(i,i+255);out.push(ch.length,...ch)}out.push(0)});
+  out.push(0x3B);return new Uint8Array(out);
+}
+let d8Spin=false;
+function d8Play(){ // loop one direction, or spin through all eight like a turntable
+  clearInterval(d8Timer);if(!d8||!d8.anim)return;
+  const m=d8.anim.meta,[cw,ch]=m.cell,N=m.hframes,ai=ORDER.indexOf($('d8Anim').value),o=$('d8Prev'),x=o.getContext('2d');
+  o.width=cw;o.height=ch;o.style.width=cw*Math.max(1,Math.floor(360/Math.max(cw,ch)))+'px';
+  let i=0;d8Timer=setInterval(()=>{const di=d8Spin?Math.floor(i/+$('d8Hold').value)%8:D8_ORDER.indexOf($('d8Dir').value);
+    x.clearRect(0,0,cw,ch);x.drawImage(d8.anim.sheet,(i%N)*cw,(di*ORDER.length+ai)*ch,cw,ch,0,0,cw,ch);i++},1000/m.fps);
+}
+$('d8Hold').onchange=()=>d8Play();
+$('d8Spin').onclick=()=>{d8Spin=!d8Spin;$('d8Spin').textContent='Spin 360: '+(d8Spin?'on':'off');d8Play()};
+$('d8Gif').onclick=async()=>{if(!d8)return msg('Build the sheet first.');
+  const m=d8.anim.meta,[cw,ch]=m.cell,N=m.hframes,ai=ORDER.indexOf($('d8Anim').value),k=Math.max(1,Math.floor(300/ch)),W=cw*k,H=ch*k,fr=[],hold=+$('d8Hold').value;
+  for(let t=0;t<8*hold;t++){const di=Math.floor(t/hold),c=mk(W,H),x=c.getContext('2d');x.imageSmoothingEnabled=false;
+    x.drawImage(d8.anim.sheet,(t%N)*cw,(di*ORDER.length+ai)*ch,cw,ch,0,0,W,H);fr.push(x.getImageData(0,0,W,H).data)}
+  const blob=new Blob([gifBytes(fr,W,H,Math.max(2,Math.round(100/m.fps)))],{type:'image/gif'}),n=await saveFiles('',assetName()+'_turntable',[{ext:'gif',blob}]);
+  dl(blob,n+'.gif');msg(`Saved ${n}.gif (all 8 directions turning, ${$('d8Anim').value} animation) to ${destLabel('')} and downloaded it.`)};
+$('d8Dir').onchange=$('d8Anim').onchange=d8Play;
+$('d8Gen').onclick=async()=>{
+  if(!curC)return msg('Generate or pick an asset first.');if(!cfg.key)return msg('Add your Gemini API key in the sidebar.');
+  if(alphaArea(curC)>curC.width*curC.height*.9)return msg('This asset still has a solid background, so the whole rectangle would be animated. Raise Background cutout strength until only the character remains, then tap again.');
+  const v=$('view').value,face=/south-east/.test(v)?'SE':/south-west/.test(v)?'SW':'S',base=face==='SW'?flipC(curC):curC,fb=bbox(base),th=fb.b-fb.t+1;
+  const faceTxt=face==='S'?'south, toward the viewer':'south-east, toward the lower right of the frame';
+  msg('Drawing five headings on one sheet (1 image)…');
+  try{
+    const prompt=`${STY()}\n\nThe attached image is the reference character, which faces ${faceTxt}. Draw ONE image with five figures of the SAME character, with identical armor, colors, proportions and weapon, in the same neutral ready pose and the same isometric camera. Top row, left to right: facing south (toward the viewer), facing south-east (toward the lower right), facing east (side view toward the right). Bottom row, left to right: facing north-east (away, toward the upper right), facing north (directly away from the viewer). The figure facing ${faceTxt} must match the reference exactly. All five are the same size, stand on the same ground line as their row neighbours, and are separated by wide empty space. No labels, no text, no borders. Background: one flat solid #FF00FF magenta fill, no shadow.`;
+    const {img,cells:c5}=await sheetCells(prompt,face==='SW'?magentaRef(base):curSrcUrl(),5,base,fb,th);c5[face==='S'?0:1]=clone(base); // keep your own sprite exactly
+    const pick=pick8(c5),W=base.width,H=base.height,sheet=mk(W*8,H),x=sheet.getContext('2d');
+    D8_ORDER.forEach((k,i)=>x.drawImage(pick[k],i*W,0));d8={sheet,W,H};let steps=[];
+    if($('d8Step').checked){
+      for(const leg of ['mid-stride in a walking step: the left foot stepping forward and the opposite arm swinging forward, the other foot behind, both feet touching the ground line','mid-stride in a walking step: the right foot stepping forward and the opposite arm swinging forward, the other foot behind, both feet touching the ground line']){prog.det(1+steps.length,4);msg(`Drawing stepping pose ${steps.length+1} of 2…`);
+        try{steps.push(pick8(await stepSheet(img,leg,base,fb,th)))}catch(e){d8.note=' Stepping poses were skipped ('+e.message+'), so move uses the built-in motion.';steps=null;break}}
+    }else steps=null;
+    let atk=null;
+    if($('d8Atk').checked){prog.det(3,4);msg('Drawing the attack pose…');
+      try{atk=pick8(await stepSheet(img,'at the moment of a strike: the weapon arm extended forward with the weapon swung through, the body leaning into it, both feet planted on the ground line (an unarmed figure throws a punch)',base,fb,th))}catch(e){d8.note=(d8.note||'')+' Attack pose skipped ('+e.message+').'}}
+    d8.anim=frames8(pick,steps,atk);
+    const o=$('d8cv');o.width=sheet.width;o.height=H;o.getContext('2d').drawImage(sheet,0,0);
+    $('d8Stage').hidden=false;$('d8Save').hidden=false;$('d8Ctl').hidden=false;d8Play();await d8SaveAll();
+  }catch(e){msg('Error: '+e.message)}
+};
+$('d8Save').onclick=d8SaveAll;
+$('aSheetSave').onclick=async()=>{
+  if(!aStore.front)return msg('Load a sprite first.');
+  const F=aStore.front.src,c=mk(F.width*2,F.height*2),x=c.getContext('2d');
+  ['front','back','left','right'].forEach((d,i)=>{if(aStore[d])x.drawImage(aStore[d].src,(i%2)*F.width,(i>>1)*F.height)});
+  const n=await savePng(c,'',aTag()+'_turnaround');msg(`Saved ${n}.png (front, back / left, right) to ${destLabel('')}.`);
+};
+$('aUse').onclick=()=>{if(!curC)return msg('Generate or pick an asset in tab 1 first.');loadSource(curC)};
+$('aFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  try{const im=await loadImg(URL.createObjectURL(f)),c=mk(im.width,im.height);c.getContext('2d').drawImage(im,0,0);loadSource(c)}catch(err){msg(err.message)}};
+function frame(name,t,cw,ch,padY,flip){
+  const src=flip?flipC(aSrc):aSrc,u=src.width/16,p=POSES[name](t,u),c=mk(cw,ch),x=c.getContext('2d');x.imageSmoothingEnabled=false;
+  if(aDir==='back'){p.dy-=p.dx*.6;p.dx=0;p.fx='';p.lean=0} // facing away: lunge up the screen
+  else if(aDir==='S'){p.dy+=p.dx*.5;p.dx=0;p.fx='';p.lean=0} // facing the viewer: lunge down the screen
+  const base=warp(src,p),m=(base.width-src.width)/2;
+  const w=Math.max(1,Math.round(base.width*p.sx)),h=Math.max(1,Math.round(base.height*p.sy));
+  let layer=base;
+  if(p.tint){layer=mk(w,h);const l=layer.getContext('2d');l.imageSmoothingEnabled=false;l.drawImage(base,0,0,w,h);
+    l.globalCompositeOperation='source-atop';l.globalAlpha=p.ta;l.fillStyle=p.tint;l.fillRect(0,0,w,h)}
+  const px=Math.round((cw-w)/2+p.dx),py=Math.round(ch-padY-h+p.dy+m*p.sy),s=Math.max(2,Math.round(u/2));
+  x.drawImage(layer,px,py,w,h);
+  if(p.fx==='slash'){x.fillStyle='#F3C623';const bx=px+w-s,by=py+Math.round(h*.25);for(let k=0;k<6;k++)x.fillRect(bx+Math.round(k*s*1.5),by+k*s*2,s*3,s)}
+  if(p.fx==='shield'||p.fx==='hit'){x.fillStyle=p.fx==='hit'?'#F0F2F5':'#F3C623';
+    const bx=px+w+s,by=py+Math.round(h*.15),seg=Math.max(2,Math.round(h*.09));
+    for(let k=0;k<6;k++)x.fillRect(bx+(k===0||k===5?0:s),by+k*Math.round(h*.12),s,seg)}
+  if(p.fx==='muzzle'){const bx=px+w-s,by=py+Math.round(h*.42);
+    x.fillStyle='#F3C623';x.fillRect(bx,by,s*4,s);x.fillRect(bx+s,by-s,s*2,s*3);x.fillStyle='#F0F2F5';x.fillRect(bx+s,by,s*2,s)}
+  return flip?flipC(c):c;
+}
+function aiFrame(name,i,N,cw,ch,padY){ // one-shot moves: ready pose, the AI poses, back to ready. Loops (move) cycle the AI poses.
+  const keys=LOOP[name]?aAI[name]:[aSrc,...aAI[name],aSrc],k=keys[Math.min(keys.length-1,Math.floor(i*keys.length/N))],c=mk(cw,ch),x=c.getContext('2d');
+  x.imageSmoothingEnabled=false;x.drawImage(k,Math.round((cw-k.width)/2),ch-padY-k.height);
+  return c;
+}
+const AIPOSE={
+  move:{extra:'',feet:'The feet move as the step needs but stay on the same ground line. ',moves:'the legs and the swinging arms (a plain walking step)',steps:[
+    'mid-stride, the right foot forward and the left arm swinging forward',
+    'passing pose, both feet close together under the body',
+    'mid-stride, the left foot forward and the right arm swinging forward',
+    'passing pose, both feet close together under the body']},
+  attack:{extra:'',moves:'the weapon arm and the weapon (plus a very slight torso lean)',steps:[
+    'weapon arm drawn back, the weapon raised behind the shoulder',
+    'weapon arm swinging across the front, the weapon mid-arc',
+    'weapon arm extended forward at the end of the swing',
+    'weapon arm low and past the body, the weapon pointing down and forward']},
+  block:{extra:'',moves:'the guard arm or weapon (plus a slight crouch)',steps:[
+    'the weapon or forearm lifted halfway to guard in front of the chest',
+    'the weapon or forearm held across the chest and face in a firm guard',
+    'the same guard, the torso pushed back a tiny bit as if absorbing a hit',
+    'the guard lowering halfway back toward the ready stance']},
+  shoot:{extra:'The character uses its own ranged weapon, or a sci-fi rifle if it carries none. ',moves:'the arms holding the gun',steps:[
+    'the gun lifted halfway, the arms starting to raise',
+    'the gun raised level and aimed forward',
+    'the gun fired, the barrel tilted up slightly with a small muzzle flash at the barrel, the upper body leaning back a tiny bit',
+    'the gun lowering after the shot, the barrel tilting back down']}
+};
+const alphaArea=c=>{const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let n=0;for(let i=3;i<d.length;i+=4)if(d[i])n++;return n};
+function feet(c){ // lowest opaque row and the x-center of the bottom rows
+  const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data,w=c.width,h=c.height;let low=-1;
+  for(let y=h-1;y>=0&&low<0;y--)for(let x=0;x<w;x++)if(d[(y*w+x)*4+3]){low=y;break}
+  if(low<0)return{y:h-1,x:w/2};
+  let sx=0,n=0;for(let y=Math.max(0,low-Math.ceil(h*.08));y<=low;y++)for(let x=0;x<w;x++)if(d[(y*w+x)*4+3]){sx+=x;n++}
+  return{y:low,x:sx/n};
+}
+function alignFeet(c,ref){ // keep the feet planted where they are in the reference
+  const a=feet(c),b=feet(ref),o=mk(c.width,c.height),x=o.getContext('2d');
+  x.imageSmoothingEnabled=false;x.drawImage(c,Math.round(b.x-a.x),Math.round(b.y-a.y));return o;
+}
+async function genPose(name,i,note,prevC){ // draws one pose; with a note, the previous attempt is sent as a second image
+  const {steps,extra,moves,feet}=AIPOSE[name],refUrl=magentaRef(aSrc),n=Math.max(aSrc.width,aSrc.height),ra=alphaArea(aSrc)||1;
+  const fix=note?`The second attached image is a previous attempt at this pose that needs a correction. Correction from the artist: ${note}. Keep what is already right in it. `:'';
+  const prompt=`${STY()}\n\nThe first attached image is the reference character. Draw the SAME character, with identical armor, colors, proportions and weapon, in this pose: ${steps[i]}. ${extra}${DIRNOTE[aDir]}${fix}Make the smallest change from the reference that shows this pose: only ${moves} should move. Exactly the same body as the reference, with the same number of arms and legs, no extra limbs, no extra or duplicate weapons, no new parts. ${feet||'Both feet stay planted in exactly the same place. '}No motion blur, speed lines or effects. Keep the same camera angle, the same size and the same position in the frame as the reference. ${BG}`;
+  let best=null,bs=9;
+  for(let t=0;t<2&&bs>.25;t++){ // retry once if the body size is far off (extra or missing limbs)
+    const c=processImg(await loadImg(await gemini(prompt,refUrl,note&&prevC?magentaRef(prevC):undefined)),n,+$('tol').value),s=Math.abs(Math.log((alphaArea(c)||1)/ra));
+    if(s<bs){bs=s;best=c}
+  }
+  return alignFeet(best,aSrc);
+}
+const aiLock=v=>document.querySelectorAll('.aiBtn').forEach(b=>b.disabled=v);
+async function aiAnim(name){
+  if(!aSrc)return msg('Load a sprite first.');
+  if($('aDirSel').value!==aDir)return msg('Generate this direction first, then pose it.');
+  if(!cfg.key)return msg('Add your Gemini API key in the sidebar.');
+  const dirTag=aDir,steps=AIPOSE[name].steps,out=[];
+  aiLock(true);
+  try{
+    for(let i=0;i<steps.length;i++){prog.det(i,steps.length);msg(`Drawing ${name} pose ${i+1} of ${steps.length}…`);out.push(await genPose(name,i,''))}
+    aStore[dirTag].ai[name]=out;$('aSel').value=name;useDir(dirTag);msg(`AI ${name} poses are now in the ${name} row (${dirTag}). Tap a pose below the preview to fix just that one.`);
+  }catch(e){msg('Error: '+e.message+(out.length?` (${out.length} of ${steps.length} poses finished, none applied.)`:''))}
+  aiLock(false);
+}
+$('aAI').onclick=()=>aiAnim('attack');$('aBlk').onclick=()=>aiAnim('block');$('aShoot').onclick=()=>aiAnim('shoot');$('aMove').onclick=()=>aiAnim('move');
+$('aAIoff').onclick=()=>{const n=$('aSel').value;delete aAI[n];buildAnims();msg('Back to the built-in '+n+' motion.')};
+let poseSel=0;
+function renderPoses(){
+  const n=$('aSel').value,list=aAI[n],box=$('poseStrip');box.innerHTML='';$('poseBox').hidden=!list;
+  if(!list)return;
+  poseSel=Math.min(poseSel,list.length-1);
+  list.forEach((c,i)=>{const t=clone(c);t.style.borderColor=i===poseSel?'#f3c623':'';t.onclick=()=>{poseSel=i;renderPoses()};box.appendChild(t)});
+  $('poseTxt').textContent=`Pose ${poseSel+1}: ${AIPOSE[n].steps[poseSel]}`;
+}
+$('poseRedo').onclick=async()=>{
+  const n=$('aSel').value,list=aAI[n];if(!list)return;
+  if(!cfg.key)return msg('Add your Gemini API key in the sidebar.');if($('aDirSel').value!==aDir)return msg('Generate this direction first.');
+  const i=poseSel,note=$('poseNote').value.trim(),dirTag=aDir;
+  $('poseRedo').disabled=true;msg(`Redrawing ${n} pose ${i+1}…`);
+  try{const c=await genPose(n,i,note,list[i]);aStore[dirTag].ai[n][i]=c;$('poseNote').value='';useDir(dirTag);msg(`Pose ${i+1} updated. Check the preview.`)}
+  catch(e){msg('Error: '+e.message)}
+  $('poseRedo').disabled=false;
+};
+function buildAnims(){
+  if(!aStore.front)return;
+  const N=+$('aN').value,F=aStore.front.src,padX=Math.round(F.width*.45),padY=Math.round(F.height*.1),cw=F.width+padX*2,ch=F.height+padY*2;
+  aCell=[cw,ch];aDirs=DIRS.filter(d=>aStore[d]);aAll={};
+  aDirs.forEach(d=>aAll[d]=withDir(d,()=>{const fr={};
+    ORDER.forEach(n=>{fr[n]=[];for(let i=0;i<N;i++)fr[n].push(aAI[n]?aiFrame(n,i,N,cw,ch,padY):frame(n,LOOP[n]?i/N:i/(N-1),cw,ch,padY,d==='left'))});return fr}));
+  aFrames=aAll[aDir];
+  const s=mk(cw*N,ch*aDirs.length*ORDER.length),x=s.getContext('2d');
+  aDirs.forEach((d,di)=>ORDER.forEach((n,r)=>aAll[d][n].forEach((f,i)=>x.drawImage(f,i*cw,(di*ORDER.length+r)*ch))));aSheet=s;
+  const ai=Object.keys(aAI);
+  $('aInfo').textContent=`Cell ${cw}x${ch}. Godot Hframes ${N}, Vframes ${aDirs.length*ORDER.length}. Rows per direction: ${ORDER.join(', ')}. Directions: ${aDirs.join(', ')}.`+(ai.length?` AI poses in ${aDir}: ${ai.join(', ')}.`:'');
+  play();renderPoses();rigDraw();
+}
+function play(){
+  clearInterval(aTimer);const list=aFrames[$('aSel').value];if(!list)return;
+  const o=$('aPrev');o.width=aCell[0];o.height=aCell[1];
+  o.style.width=aCell[0]*Math.max(1,Math.floor(384/Math.max(aCell[0],aCell[1])))+'px';
+  let i=0;aTimer=setInterval(()=>{const x=o.getContext('2d');x.clearRect(0,0,o.width,o.height);x.drawImage(list[i%list.length],0,0);i++},1000/(+$('aFps').value));
+}
+let RIG=null,rigMode='',rigPts=[],rigDown=false;
+function mkArm(g){const s=g.src,w=s.width,h=s.height;g.part=mk(w,h);let c=g.part.getContext('2d');lpath(c,w,h,g.arm.poly);c.save();c.clip();c.drawImage(s,0,0);c.restore();
+  g.body=clone(s);c=g.body.getContext('2d');c.globalCompositeOperation='destination-out';lpath(c,w,h,g.arm.poly);c.fill()}
+function rigDraw(){if(!aSrc)return;const cv=$('rigCv'),k=Math.max(1,Math.floor(300/Math.max(aSrc.width,aSrc.height))),w=aSrc.width*k,h=aSrc.height*k,b=bbox(aSrc),x=cv.getContext('2d'),g=RIG||{hip:.55,split:.5};
+  cv.width=w;cv.height=h;x.imageSmoothingEnabled=false;x.drawImage(aSrc,0,0,w,h);x.lineWidth=2;
+  x.strokeStyle='#F3C623';const hy=(b.t+(b.b-b.t)*g.hip)*k;x.beginPath();x.moveTo(0,hy);x.lineTo(w,hy);x.stroke();
+  x.strokeStyle='#FF5A5A';const sx=(b.l+(b.r-b.l)*g.split)*k;x.beginPath();x.moveTo(sx,0);x.lineTo(sx,h);x.stroke();
+  const poly=rigDown&&rigMode==='arm'?rigPts:g.arm&&g.arm.poly;if(poly&&poly.length>2){lpath(x,w,h,poly);x.fillStyle='rgba(243,198,35,.3)';x.fill()}
+  if(g.arm){x.fillStyle='#fff';x.beginPath();x.arc(g.arm.pivot[0]*w,g.arm.pivot[1]*h,4,0,7);x.fill()}}
+const rpos=e=>{const r=$('rigCv').getBoundingClientRect();return[(e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height]};
+function rigSet(e){const [u,v]=rpos(e),b=bbox(aSrc),cl=(t,lo,hi)=>Math.min(hi,Math.max(lo,t));RIG=RIG||{hip:.55,split:.5};
+  if(rigMode==='hip')RIG.hip=cl((v*aSrc.height-b.t)/(b.b-b.t),.2,.9);
+  else if(rigMode==='split')RIG.split=cl((u*aSrc.width-b.l)/(b.r-b.l),.1,.9);
+  else if(rigMode==='pivot'&&RIG.arm)RIG.arm.pivot=[u,v]}
+function rigGo(){if(RIG&&RIG.arm&&RIG.src===aSrc&&RIG.part){RIG.part=RIG.body=null}buildAnims()}
+$('rigCv').onpointerdown=e=>{if(!rigMode||!aSrc)return;rigDown=true;e.target.setPointerCapture(e.pointerId);if(rigMode==='arm')rigPts=[rpos(e)];else rigSet(e);rigDraw()};
+$('rigCv').onpointermove=e=>{if(!rigDown)return;if(rigMode==='arm')rigPts.push(rpos(e));else rigSet(e);rigDraw()};
+$('rigCv').onpointerup=()=>{if(!rigDown)return;rigDown=false;
+  if(rigMode==='arm'&&rigPts.length>2){const us=rigPts.map(q=>q[0]),vs=rigPts.map(q=>q[1]);RIG=RIG||{hip:.55,split:.5};
+    RIG.arm={poly:rigPts,pivot:[us.reduce((p,q)=>p+q,0)/us.length,Math.min(...vs)+(Math.max(...vs)-Math.min(...vs))*.12]};RIG.src=aSrc;RIG.part=RIG.body=null;msg('Arm captured. Tap 4 Shoulder and touch the shoulder joint.')}
+  rigGo()};
+[['rigHip','hip'],['rigSplit','split'],['rigArm','arm'],['rigPivot','pivot']].forEach(([id,m])=>$(id).onclick=()=>{if(!aSrc)return msg('Load a sprite first.');rigMode=m;rigDraw();msg({hip:'Touch or drag on the sprite where the waist is.',split:'Touch where the legs divide.',arm:'Draw a loop around the weapon arm.',pivot:'Touch the shoulder joint.'}[m])});
+$('rigReset').onclick=()=>{RIG=null;rigMode='';rigGo();msg('Rig reset to automatic.')};
+$('aN').onchange=buildAnims;$('aSel').onchange=()=>{play();renderPoses()};$('aFps').onchange=play;
+const aJson=()=>new Blob([JSON.stringify({project:cur,cell:aCell,fps:+$('aFps').value,hframes:+$('aN').value,vframes:aDirs.length*ORDER.length,
+  rows:aDirs.flatMap((d,di)=>ORDER.map((n,r)=>({direction:d,animation:n,row:di*ORDER.length+r,frames:+$('aN').value,loop:LOOP[n]})))},null,2)],{type:'application/json'});
+const aTag=()=>assetName();
+$('aDl').onclick=async()=>{if(!aSheet)return msg('Load a sprite first.');dl(await toBlob(aSheet),aTag()+'_anims.png');dl(aJson(),aTag()+'_anims.json')};
+$('aLib').onclick=async()=>{if(!aSheet)return msg('Load a sprite first.');
+  const n=await saveFiles('Animations',aTag()+'_anims',[{ext:'png',blob:await toBlob(aSheet)},{ext:'json',blob:aJson()}]);
+  msg(`Saved ${n}.png and .json to ${destLabel('Animations')}.`)};
+
+/* ---------- TAB 3: Tile slicer ---------- */
+let tim=null;
+$('tileFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{tim=await loadImg(URL.createObjectURL(f));drawTiles()}catch(err){msg(err.message)}};
+const G=()=>({tw:+$('tw').value,th:+$('th').value,ox:+$('ox').value,oy:+$('oy').value,sp:+$('sp').value,m:$('mode').value});
+function cells(){
+  const {tw,th,ox,oy,sp}=G(),o=[];if(!tim||tw<1||th<1)return o;
+  for(let y=oy;y+th<=tim.height;y+=th+sp)for(let x=ox;x+tw<=tim.width;x+=tw+sp)o.push([x,y]);return o;
+}
+function pts(x,y,w,h,m){
+  if(m==='hexp')return[[x+w/2,y],[x+w,y+h/4],[x+w,y+h*3/4],[x+w/2,y+h],[x,y+h*3/4],[x,y+h/4]];
+  if(m==='hexf')return[[x+w/4,y],[x+w*3/4,y],[x+w,y+h/2],[x+w*3/4,y+h],[x+w/4,y+h],[x,y+h/2]];
+  return[[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
+}
+function path(c,p){c.beginPath();p.forEach(([a,b],i)=>i?c.lineTo(a,b):c.moveTo(a,b));c.closePath()}
+function drawTiles(){
+  if(!tim)return;const z=+$('zoom').value,cv=$('tcv'),x=cv.getContext('2d'),{tw,th,m}=G();
+  cv.width=tim.width*z;cv.height=tim.height*z;x.imageSmoothingEnabled=false;x.drawImage(tim,0,0,cv.width,cv.height);
+  x.strokeStyle='#f3c623';x.lineWidth=1;const cs=cells();
+  cs.forEach(([cx,cy])=>{path(x,pts(cx*z,cy*z,tw*z,th*z,m));x.stroke()});
+  $('tInfo').textContent=`${cs.length} cells of ${tw}x${th} on a ${tim.width}x${tim.height} image.`;
+}
+['tw','th','ox','oy','sp','mode','zoom'].forEach(id=>$(id).oninput=drawTiles);
+
+function sockets(d,w,h){
+  const avg=list=>{let r=0,g=0,b=0,n=0;for(const[x,y]of list){const i=(y*w+x)*4;if(d[i+3]>127){r+=d[i];g+=d[i+1];b+=d[i+2];n++}}
+    return n?[r,g,b].map(v=>(v/n>>5).toString(16)).join(''):'x'};
+  const T=[],B=[],L=[],R=[];
+  for(let i=0;i<w;i++)for(let j=0;j<2;j++){T.push([i,j]);B.push([i,h-1-j])}
+  for(let j=0;j<h;j++)for(let i=0;i<2;i++){L.push([i,j]);R.push([w-1-i,j])}
+  return{n:avg(T),e:avg(R),s:avg(B),w:avg(L)};
+}
+function buildAtlas(){
+  if(!tim)throw new Error('Load an image first.');
+  const {tw,th,m}=G(),src=mk(tim.width,tim.height),sx=src.getContext('2d');sx.drawImage(tim,0,0);
+  const tiles=[];
+  cells().forEach(([cx,cy])=>{
+    const t=mk(tw,th),x=t.getContext('2d');
+    if(m!=='sq'){path(x,pts(0,0,tw,th,m));x.clip()}
+    x.drawImage(src,cx,cy,tw,th,0,0,tw,th);
+    const d=x.getImageData(0,0,tw,th).data;
+    let used=false;for(let i=3;i<d.length;i+=4)if(d[i]){used=true;break}
+    if($('skip').checked&&!used)return;
+    tiles.push({t,src:[cx,cy],sock:m==='sq'?sockets(d,tw,th):undefined});
+  });
+  if(!tiles.length)throw new Error('No tiles found. Check the offsets and tile size.');
+  const ac=Math.ceil(Math.sqrt(tiles.length)),ar=Math.ceil(tiles.length/ac),a=mk(ac*tw,ar*th),ax=a.getContext('2d');
+  tiles.forEach((o,i)=>ax.drawImage(o.t,(i%ac)*tw,Math.floor(i/ac)*th));
+  const json={project:cur,shape:m,tileSize:[tw,th],atlasColumns:ac,atlasRows:ar,
+    tiles:tiles.map((o,i)=>({id:i,atlas:[i%ac,Math.floor(i/ac)],source:o.src,sockets:o.sock}))};
+  return{atlas:a,json:new Blob([JSON.stringify(json,null,2)],{type:'application/json'}),count:tiles.length};
+}
+$('dlAtlas').onclick=async()=>{try{const r=buildAtlas();dl(await toBlob(r.atlas),'tile_atlas.png');dl(r.json,'tile_atlas.json');msg(r.count+' tiles exported.')}catch(e){msg(e.message)}};
+$('saveAtlas').onclick=async()=>{try{const r=buildAtlas(),n=await saveFiles('Tilesets','tile_atlas',[{ext:'png',blob:await toBlob(r.atlas)},{ext:'json',blob:r.json}]);
+  msg(`Saved ${n}.png and .json to ${destLabel('Tilesets')}.`)}catch(e){msg(e.message)}};
+
+/* ---------- Factions, subfactions, asset types, saved files ---------- */
+let db=null,memAssets=[],selId=null,urls=[],fdTimer=null,ready=Promise.resolve();
+const TYPES=['Characters','Infantry','Heavy Armor','Buildings','Weapons & Gear','Terrain & Foliage','Props','Icons','Tilesets','References'];
+const TYPE_OF={Chassis:'Characters',Character:'Characters','Infantry unit':'Infantry','Heavy armor unit':'Heavy Armor',Building:'Buildings','Weapon or gear':'Weapons & Gear',Terrain:'Terrain & Foliage',Foliage:'Terrain & Foliage',Rocks:'Terrain & Foliage',Prop:'Props',Icon:'Icons'};
+const typeNow=()=>TYPE_OF[$('cat').value]||'Props';
+const assetName=()=>slug($('dName').value.trim()||$('desc').value);
+let dest=ls.get('imp:dest2',{faction:'Imperium',sub:'General'});
+const saveDest=()=>ls.set('imp:dest2',dest);
+const defTree=()=>[['Chaos',['Black Legion','Death Guard']],['Xenos',['Orks','Tyranids']],['Imperium',['Dark Angels','Space Wolves']],['Leagues of Votann',[]],['Neutral',[]]].map(([name,s])=>({name,subs:['General',...s]}));
+const tree=()=>{if(!P().tree)P().tree=defTree();P().tree.forEach(f=>{if(!f.subs){f.subs=['General'];delete f.sections}else if(!f.subs.includes('General'))f.subs.unshift('General')});return P().tree};
+const facOf=n=>tree().find(f=>f.name===n);
+const destLabel=x=>`${cur} / ${dest.faction} / ${dest.sub} / ${x==='Tilesets'?'Tilesets':typeNow()} / ${x==='Tilesets'?(slug($('dName').value)||'tile_atlas'):assetName()}`;
+const showPath=()=>{$('dPath').textContent='Saves to: '+destLabel()};
+function fill(sel,opts,val){sel.innerHTML='';opts.forEach(([v,t])=>sel.add(new Option(t,v)));if(opts.some(o=>o[0]===val))sel.value=val}
+function drawDest(){
+  if(!facOf(dest.faction))dest.faction=tree()[0].name;const f=facOf(dest.faction);if(!f.subs.includes(dest.sub))dest.sub='General';
+  fill($('dFac'),tree().map(x=>[x.name,x.name]),dest.faction);fill($('dSub'),f.subs.map(x=>[x,x]),dest.sub);saveDest();showPath();updateBadge();chState();
+}
+$('dFac').onchange=e=>{dest.faction=e.target.value;dest.sub='General';drawDest()};
+$('dSub').onchange=e=>{dest.sub=e.target.value;saveDest();showPath()};
+['cat','desc','dName'].forEach(id=>{$(id).addEventListener('input',showPath);$(id).addEventListener('change',showPath)});
+const nm=()=>$('addName').value.trim().replace(/[\\/:*?"<>|]/g,'_');
+$('addFac').onclick=()=>{const n=nm();if(!n)return msg('Type a name first.');if(facOf(n))return msg('That faction already exists.');
+  const t=tree(),i=t.findIndex(f=>f.name==='Neutral');t.splice(i<0?t.length:i,0,{name:n,subs:['General']});
+  saveProj();dest={faction:n,sub:'General'};$('addName').value='';drawDest();msg(`Added faction ${n}.`)};
+$('addSub').onclick=()=>{const n=nm();if(!n)return msg('Type a name first.');const f=facOf(dest.faction);
+  if(f.subs.includes(n))return msg('That subfaction already exists.');
+  f.subs.push(n);saveProj();dest.sub=n;$('addName').value='';drawDest();msg(`Added ${n} under ${f.name}.`)};
+async function holds(fac,sub){return (await allAssets()).some(r=>r.project===cur&&r.faction===fac&&(!sub||r.sub===sub))}
+$('rmSub').onclick=async()=>{if(dest.sub==='General')return msg('General stays in every faction.');
+  if(await holds(dest.faction,dest.sub))return msg('That subfaction still has saved files, so it cannot be removed.');
+  const f=facOf(dest.faction);f.subs=f.subs.filter(x=>x!==dest.sub);saveProj();dest.sub='General';drawDest();msg('Subfaction removed.')};
+$('rmFac').onclick=async()=>{const t=tree();if(t.length<2)return msg('You need at least one faction.');
+  if(await holds(dest.faction,''))return msg('That faction still has saved files, so it cannot be removed.');
+  const gone=dest.faction;P().tree=t.filter(f=>f.name!==gone);saveProj();drawDest();msg(`Removed faction ${gone}.`)};
+
+/* storage (IndexedDB, with an in-memory fallback if the browser blocks it) */
+const dbOpen=()=>new Promise(res=>{try{const r=indexedDB.open('imperium-assets',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('assets',{keyPath:'id'});r.onsuccess=()=>res(r.result);r.onerror=()=>res(null);r.onblocked=()=>res(null)}catch{res(null)}});
+function rawAll(){return db?new Promise(res=>{const q=db.transaction('assets').objectStore('assets').getAll();q.onsuccess=()=>res(q.result);q.onerror=()=>res([])}):Promise.resolve(memAssets.slice())}
+async function allAssets(){await ready;return rawAll()}
+function putAsset(rec){
+  if(!db){memAssets=memAssets.filter(r=>r.id!==rec.id);memAssets.push(rec);return Promise.resolve()}
+  return new Promise(res=>{const t=db.transaction('assets','readwrite');t.objectStore('assets').put(rec);t.oncomplete=res;t.onerror=res});
+}
+function delAsset(id){
+  if(!db){memAssets=memAssets.filter(r=>r.id!==id);return Promise.resolve()}
+  return new Promise(res=>{const t=db.transaction('assets','readwrite');t.objectStore('assets').delete(id);t.oncomplete=res;t.onerror=res});
+}
+function updateBadge(){const n=P().unexp||0,b=document.querySelector('[data-tab=files]');if(b)b.textContent='4. Project Files'+(n?` (${n} not exported)`:'')}
+window.addEventListener('beforeunload',e=>{if((P().unexp||0)>0){e.preventDefault();e.returnValue=''}});
+const baseOf=f=>f.replace(/\.[^.]+$/,'');
+const OLD={Characters:'Characters','Weapons & Gear':'Buildings & Miscellaneous',Foliage:'Foliage & Terrain',Miscellaneous:'Buildings & Miscellaneous'};
+const TYPE_OLD={'Characters':'Characters','Units/Infantry':'Infantry','Units/Heavy Armor':'Heavy Armor','Units/Civilians':'Infantry','Buildings & Miscellaneous':'Buildings','Foliage & Terrain':'Terrain & Foliage'};
+function upgrade(r){ // older saves (folders only, or faction + folder) become faction / subfaction / type / name
+  if(r.type)return r;
+  let d=r.dir||((OLD[r.cat]||'Buildings & Miscellaneous')+(r.sub?'/'+r.sub:'')),ex=(/\/(Animations|Tilesets)$/.exec(d)||[])[1];d=d.replace(/\/(Animations|Tilesets)$/,'');
+  const {cat,sub,dir,...rest}=r;
+  return{...rest,faction:r.faction||'Neutral',sub:'General',type:ex==='Tilesets'?'Tilesets':(TYPE_OLD[d]||'Buildings'),name:baseOf(r.file).replace(/_anims$/,'')};
+}
+const idOf=r=>[r.project,r.faction,r.sub,r.type,r.name,r.file].join('|');
+async function migrate(){for(const r of (await rawAll()).filter(r=>!r.type)){const u=upgrade(r);await delAsset(r.id);await putAsset({...u,id:idOf(u)})}}
+async function saveFiles(extra,base,files){ // saves into <project>/<faction>/<subfaction>/<type>/<asset name>/; never overwrites, adds _2, _3...
+  const type=extra==='Tilesets'?'Tilesets':extra==='References'?'References':typeNow(),name=extra==='Tilesets'?(slug($('dName').value)||'tile_atlas'):extra==='References'?'photos':assetName(),fac=dest.faction,sub=dest.sub;
+  const taken=new Set((await allAssets()).filter(r=>r.project===cur&&r.faction===fac&&r.sub===sub&&r.type===type&&r.name===name).map(r=>r.file));
+  let b=base,n=2;while(files.some(f=>taken.has(b+'.'+f.ext)))b=base+'_'+n++;
+  for(const f of files){const rec={project:cur,faction:fac,sub,type,name,file:b+'.'+f.ext,blob:f.blob,t:Date.now()};await putAsset({...rec,id:idOf(rec)})}
+  if(window.PackFlowProject){ // also write into the PackFlow project: sprites/<faction>/<subfaction>/<asset>/ or tiles/<faction>/
+    const dir=type==='Tilesets'?`tiles/${slug(fac)}`:type==='References'?'sprites/references':`sprites/${slug(fac)}/${slug(sub)}/${slug(name)}`;
+    for(const f of files)await pfSave(`${dir}/${b}.${f.ext}`,f.blob);
+  }else{P().unexp=(P().unexp||0)+files.length}
+  saveProj();updateBadge();
+  if(window.filesReady)renderFiles();
+  return b;
+}
+const sameGroup=(all,r)=>all.filter(x=>x.project===r.project&&x.faction===r.faction&&x.sub===r.sub&&x.type===r.type&&x.name===r.name&&baseOf(x.file)===baseOf(r.file));
+const openSet=new Set(),chk=new Set(),LV=[r=>r.faction,r=>r.sub,r=>r.type,r=>r.name];
+const grp=(arr,f)=>{const m=new Map();arr.forEach(r=>{const k=f(r);if(!m.has(k))m.set(k,[]);m.get(k).push(r)});return m};
+const el=(t,p={})=>Object.assign(document.createElement(t),p);
+async function zipRecs(recs){const root=safe(cur),out=[];
+  for(const r of recs)out.push({path:`${root}/${safe(r.faction)}/${safe(r.sub)}/${safe(r.type)}/${safe(r.name)}/${r.file}`,data:new Uint8Array(await r.blob.arrayBuffer())});return out}
+function fileCards(items){const box=el('div',{className:'grid'});
+  items.forEach(r=>{const d=el('div',{className:'card'+(r.id===selId?' sel':'')+(chk.has(r.id)?' ck':''),title:r.file}),c=el('input',{type:'checkbox',checked:chk.has(r.id)});
+    c.onclick=e=>{e.stopPropagation();c.checked?chk.add(r.id):chk.delete(r.id);renderFiles()};d.appendChild(c);
+    if(/\.(png|gif)$/.test(r.file)){const u=URL.createObjectURL(r.blob);urls.push(u);d.appendChild(el('img',{src:u}))}else d.appendChild(el('div',{className:'json',textContent:r.file.split('.').pop().toUpperCase()}));
+    d.appendChild(el('span',{textContent:r.file}));
+    const b=el('button',{className:'go alt',textContent:'Save'});b.style.cssText='padding:2px 8px;margin:4px 0 0';b.onclick=e=>{e.stopPropagation();dl(r.blob,[r.faction,r.sub,r.type].map(slug).join('__')+'__'+r.file)};d.appendChild(b);
+    d.onclick=()=>{selId=r.id;renderFiles()};box.appendChild(d)});return box}
+function treeNode(recs,lv,path){const box=el('div');
+  for(const [k,items] of grp(recs,LV[lv])){
+    const key=path+'/'+k,d=el('details'),sm=el('summary'),c=el('input',{type:'checkbox',checked:items.every(r=>chk.has(r.id))});
+    c.onclick=e=>{e.stopPropagation();items.forEach(r=>c.checked?chk.add(r.id):chk.delete(r.id));renderFiles()};
+    const ex=el('button',{className:'go alt',textContent:'Export'});ex.style.cssText='padding:2px 8px;margin:0 0 0 6px';
+    ex.onclick=async e=>{e.preventDefault();e.stopPropagation();prog.start();await tick();try{dl(makeZip(await zipRecs(items)),slug(k)+'.zip');msg(`Exported ${items.length} files from ${k}.`)}finally{prog.end()}};
+    sm.append(c,` ${k} (${items.length}) `,ex);d.appendChild(sm);
+    const build=()=>{if(!d.dataset.b){d.dataset.b=1;d.appendChild(lv<3?treeNode(items,lv+1,key):fileCards(items))}};
+    d.open=openSet.has(key);if(d.open)build();
+    d.ontoggle=()=>{if(d.open){openSet.add(key);build()}else openSet.delete(key)};
+    box.appendChild(d)}
+  return box}
+const picked=async()=>{const all=await allAssets();return{all,sel:all.filter(r=>chk.has(r.id))}};
+const uniq=(taken,file)=>{const b=baseOf(file),e=file.slice(b.length);let f=file,n=2;while(taken.has(f))f=b+'_'+n++ +e;taken.add(f);return f};
+$('bFac').onchange=()=>fill($('bSub'),facOf($('bFac').value).subs.map(x=>[x,x]),'');
+$('bClear').onclick=()=>{chk.clear();renderFiles()};
+$('bZip').onclick=async()=>{const {sel}=await picked();if(!sel.length)return msg('Tick some files first.');dl(makeZip(await zipRecs(sel)),slug(cur)+'_selection.zip');msg(`Exported ${sel.length} selected files.`)};
+$('bMove').onclick=async()=>{const {all,sel}=await picked();if(!sel.length)return msg('Tick some files first.');
+  const f=$('bFac').value,sb=$('bSub').value,t=$('bType').value;
+  for(const r of sel){const taken=new Set(all.filter(x=>x.project===r.project&&x.faction===f&&x.sub===sb&&x.type===t&&x.name===r.name&&!chk.has(x.id)).map(x=>x.file));
+    const rec={...r,faction:f,sub:sb,type:t,file:uniq(taken,r.file)};await delAsset(r.id);await putAsset({...rec,id:idOf(rec)});all.push(rec)}
+  chk.clear();selId=null;msg(`Moved ${sel.length} files to ${f} / ${sb} / ${t}.`);renderFiles()};
+let bdTimer=null;
+$('bDel').onclick=async()=>{const b=$('bDel');if(!chk.size)return msg('Tick some files first.');
+  if(!bdTimer){b.textContent=`Tap again to delete ${chk.size}`;bdTimer=setTimeout(()=>{b.textContent='Delete selected';bdTimer=null},4000);return}
+  clearTimeout(bdTimer);bdTimer=null;b.textContent='Delete selected';const {sel}=await picked();
+  for(const r of sel)await delAsset(r.id);chk.clear();selId=null;msg(`Deleted ${sel.length} files.`);renderFiles()};
+$('bRen').onclick=async()=>{const {all,sel}=await picked(),nn=slug($('bName').value);if(!$('bName').value.trim())return msg('Type the new name first.');
+  const keys=new Set(sel.map(r=>[r.faction,r.sub,r.type,r.name].join('|')));if(keys.size!==1)return msg('Tick files from exactly one asset to rename it.');
+  const o=sel[0],group=all.filter(r=>r.project===o.project&&r.faction===o.faction&&r.sub===o.sub&&r.type===o.type&&r.name===o.name);
+  const taken=new Set(all.filter(r=>r.project===o.project&&r.faction===o.faction&&r.sub===o.sub&&r.type===o.type&&r.name===nn).map(r=>r.file));
+  for(const r of group){const f=r.file.startsWith(o.name)?nn+r.file.slice(o.name.length):r.file,rec={...r,name:nn,file:uniq(taken,f)};await delAsset(r.id);await putAsset({...rec,id:idOf(rec)})}
+  chk.clear();selId=null;$('bName').value='';msg(`Renamed ${o.name} to ${nn}.`);renderFiles()};
+async function renderFiles(){
+  const all=(await allAssets()).filter(r=>r.project===cur).sort((a,b)=>b.t-a.t);
+  $('fWarn').hidden=!!db;
+  $('fCounts').textContent=cur+': '+tree().map(f=>f.name+' '+all.filter(r=>r.faction===f.name).length).join(' · ');
+  fill($('fFac'),[['all','All factions'],...tree().map(f=>[f.name,f.name])],$('fFac').value||'all');
+  const fac=$('fFac').value;
+  fill($('fSub'),[['all','All subfactions'],...(fac==='all'?[]:facOf(fac).subs.map(x=>[x,x]))],$('fSub').value||'all');
+  fill($('fType'),[['all','All asset types'],...TYPES.map(x=>[x,x])],$('fType').value||'all');
+  const sub=$('fSub').value,ty=$('fType').value;
+  urls.forEach(u=>URL.revokeObjectURL(u));urls=[];
+  const ids=new Set(all.map(r=>r.id));[...chk].forEach(id=>{if(!ids.has(id))chk.delete(id)});
+  const g=$('fGrid');g.innerHTML='';
+  const vis=all.filter(r=>(fac==='all'||r.faction===fac)&&(sub==='all'||r.sub===sub)&&(ty==='all'||r.type===ty));
+  if(vis.length)g.appendChild(treeNode(vis,0,''));else g.innerHTML='<div class="note">Nothing saved here yet.</div>';
+  $('bCount').textContent=chk.size?chk.size+' files selected':'Nothing selected.';
+  fill($('bFac'),tree().map(f=>[f.name,f.name]),$('bFac').value);
+  fill($('bSub'),(facOf($('bFac').value)||tree()[0]).subs.map(x=>[x,x]),$('bSub').value);
+  fill($('bType'),TYPES.map(x=>[x,x]),$('bType').value);
+  const sel=all.find(r=>r.id===selId);$('fDetail').hidden=!sel;
+  if(sel){
+    $('fPath').textContent=[cur,sel.faction,sel.sub,sel.type,sel.name,sel.file].join(' / ');
+    fill($('fMoveFac'),tree().map(f=>[f.name,f.name]),sel.faction);
+    fill($('fMoveSub'),(facOf($('fMoveFac').value)||tree()[0]).subs.map(x=>[x,x]),sel.sub);
+    fill($('fMoveType'),TYPES.map(x=>[x,x]),sel.type);
+    $('fAnim').hidden=!(sel.file.endsWith('.png')&&sel.type!=='Tilesets'&&!/_anims\.png$/.test(sel.file));
+  }
+}
+$('fFac').onchange=()=>{$('fSub').value='all';renderFiles()};
+$('fSub').onchange=renderFiles;$('fType').onchange=renderFiles;
+$('fMoveFac').onchange=()=>fill($('fMoveSub'),facOf($('fMoveFac').value).subs.map(x=>[x,x]),'');
+$('fDl').onclick=async()=>{const r=(await allAssets()).find(x=>x.id===selId);if(r)dl(r.blob,[r.faction,r.sub,r.type].map(slug).join('__')+'__'+r.file)};
+$('fAnim').onclick=async()=>{const r=(await allAssets()).find(x=>x.id===selId);if(!r)return;
+  const im=await loadImg(URL.createObjectURL(r.blob)),c=mk(im.width,im.height);c.getContext('2d').drawImage(im,0,0);switchTab('anim');loadSource(c)};
+$('fMoveBtn').onclick=async()=>{
+  const all=await allAssets(),r=all.find(x=>x.id===selId);if(!r)return;
+  const toFac=$('fMoveFac').value,toSub=$('fMoveSub').value,toType=$('fMoveType').value;
+  if(toFac===r.faction&&toSub===r.sub&&toType===r.type)return;
+  const g=sameGroup(all,r),base=baseOf(r.file),taken=new Set(all.filter(x=>x.project===r.project&&x.faction===toFac&&x.sub===toSub&&x.type===toType&&x.name===r.name).map(x=>x.file));
+  let b=base,n=2;while(g.some(x=>taken.has(b+x.file.slice(base.length))))b=base+'_'+n++;
+  for(const x of g){const rec={...x,faction:toFac,sub:toSub,type:toType,file:b+x.file.slice(base.length)};await delAsset(x.id);await putAsset({...rec,id:idOf(rec)})}
+  selId=idOf({...r,faction:toFac,sub:toSub,type:toType,file:b+r.file.slice(base.length)});msg(`Moved to ${toFac} / ${toSub} / ${toType}.`);renderFiles();
+};
+$('fDel').onclick=async()=>{
+  const b=$('fDel');
+  if(!fdTimer){b.textContent='Tap again to delete';fdTimer=setTimeout(()=>{b.textContent='Delete';fdTimer=null},4000);return}
+  clearTimeout(fdTimer);fdTimer=null;b.textContent='Delete';
+  const all=await allAssets(),r=all.find(x=>x.id===selId);if(!r)return;
+  for(const x of sameGroup(all,r))await delAsset(x.id);selId=null;msg('Deleted.');renderFiles();
+};
+
+/* minimal ZIP writer (no compression), so the folders survive the download */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc32=u=>{let c=-1;for(let i=0;i<u.length;i++)c=CRC[(c^u[i])&255]^(c>>>8);return(c^-1)>>>0};
+function makeZip(files){
+  const enc=new TextEncoder(),parts=[],cen=[];let off=0,cs=0;
+  for(const f of files){
+    const nm=enc.encode(f.path),crc=crc32(f.data),sz=f.data.length,lh=new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(12,0x21,true);
+    lh.setUint32(14,crc,true);lh.setUint32(18,sz,true);lh.setUint32(22,sz,true);lh.setUint16(26,nm.length,true);
+    parts.push(lh.buffer,nm,f.data);
+    const ch=new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);ch.setUint16(14,0x21,true);
+    ch.setUint32(16,crc,true);ch.setUint32(20,sz,true);ch.setUint32(24,sz,true);ch.setUint16(28,nm.length,true);ch.setUint32(42,off,true);
+    cen.push(ch.buffer,nm);cs+=46+nm.length;off+=30+nm.length+sz;
+  }
+  const end=new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true);end.setUint16(8,files.length,true);end.setUint16(10,files.length,true);end.setUint32(12,cs,true);end.setUint32(16,off,true);
+  return new Blob([...parts,...cen,end.buffer],{type:'application/zip'});
+}
+const safe=s=>s.replace(/[\\/:*?"<>|]/g,'_');
+async function zipEntries(){
+  const all=(await allAssets()).filter(r=>r.project===cur),root=safe(cur),out=[],none=new Uint8Array(0);
+  tree().forEach(f=>{const fp=`${root}/${safe(f.name)}`;out.push({path:fp+'/',data:none});
+    f.subs.forEach(sb=>{out.push({path:`${fp}/${safe(sb)}/`,data:none});TYPES.forEach(t=>out.push({path:`${fp}/${safe(sb)}/${safe(t)}/`,data:none}))})});
+  for(const r of all)out.push({path:`${root}/${safe(r.faction)}/${safe(r.sub)}/${safe(r.type)}/${safe(r.name)}/${r.file}`,data:new Uint8Array(await r.blob.arrayBuffer())});
+  out.push({path:`${root}/style_bible.txt`,data:new TextEncoder().encode(P().style+'\n\nPalette: '+(P().pal||'')+'\n')});
+  return{out,count:all.length};
+}
+$('fZip').onclick=async()=>{
+  const {out,count}=await zipEntries();dl(makeZip(out),slug(cur)+'.zip');P().unexp=0;saveProj();updateBadge();
+  msg(`Exported ${count} files as Faction / Subfaction / Asset type / Asset name. Open the ZIP from your Downloads folder to unpack it.`);
+};
+const blobB64=b=>new Promise(res=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.readAsDataURL(b)});
+$('fSave').onclick=async()=>{
+  const all=(await allAssets()).filter(r=>r.project===cur),assets=[];
+  for(const r of all)assets.push({faction:r.faction,sub:r.sub,type:r.type,name:r.name,file:r.file,mime:r.blob.type||'application/octet-stream',data:await blobB64(r.blob)});
+  dl(new Blob([JSON.stringify({format:'imperium-project',version:3,name:cur,style:P().style,pal:P().pal||'',facPal:P().facPal||{},tone:P().tone||null,tree:tree(),assets})],{type:'application/json'}),slug(cur)+'.imperium.json');
+  P().unexp=0;saveProj();updateBadge();msg(`Project file saved with ${assets.length} assets.`);
+};
+$('fLoadBtn').onclick=()=>$('fLoad').click();
+$('fLoad').onchange=async e=>{
+  const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{
+    const j=JSON.parse(await f.text());if(j.format!=='imperium-project')throw new Error('That is not an Imperium project file.');
+    let name=j.name||'Imported project';while(projects[name])name+=' (2)';
+    projects[name]={style:j.style||DEF_STYLE,pal:j.pal||'',facPal:j.facPal||{},tone:j.tone||null,tree:j.tree||defTree()};cur=name;saveProj();
+    for(const a of j.assets||[]){
+      const {data,mime,...meta}=a,u={...upgrade(meta),project:cur},blob=await (await fetch(`data:${mime};base64,${data}`)).blob();
+      await putAsset({...u,id:idOf(u),blob,t:Date.now()});
+    }
+    drawProj();msg(`Loaded project "${name}" with ${(j.assets||[]).length} assets.`);
+  }catch(err){msg('Error: '+err.message)}
+};
+let isoOut=[];
+const isoName=f=>slug(f.name.replace(/\.[^.]+$/,''));
+$('isoGo').onclick=async()=>{const files=[...$('isoFile').files],ai=$('isoMeth').value==='ai',clear=$('isoMode').value==='clear',hex=$('isoColor').value;
+  if(!files.length)return msg('Pick one or more photos first.');if(ai&&!cfg.key)return msg('Add your Gemini API key in the sidebar.');
+  isoOut=[];$('isoGrid').innerHTML='';$('isoSave').hidden=true;
+  for(const [i,f] of files.entries()){prog.det(i,files.length);msg(`Isolating ${i+1} of ${files.length}…`);
+    try{const im=await loadImg(URL.createObjectURL(f));let c;
+      if(ai){const o=await loadImg(await gemini(`The attached image is a character render. Remove the background completely. Keep the character exactly as it is, with identical colors, size, position and details. Fill the entire background with one flat solid ${hex} color, no shadow, no gradient, no text.`,imgUrl(im)));
+        c=mk(o.width,o.height);c.getContext('2d').drawImage(o,0,0);if(clear)keyOut(c,60)}
+      else{const cut=cutPhoto(im,Math.round(+$('isoTol').value*.38)),b=bbox(cut),p=6,cw=b.r-b.l+1,ch=b.b-b.t+1;c=mk(cw+2*p,ch+2*p);const x=c.getContext('2d');
+        if(!clear){x.fillStyle=hex;x.fillRect(0,0,c.width,c.height)}x.drawImage(cut,b.l,b.t,cw,ch,p,p,cw,ch)}
+      isoOut.push({name:isoName(f),c});
+      const card=el('div',{className:'card'});card.appendChild(el('img',{src:c.toDataURL('image/png')}));card.appendChild(el('span',{textContent:isoName(f)}));
+      const b1=el('button',{className:'go alt',textContent:'Use for Pixelate'});b1.style.cssText='padding:2px 8px;margin:4px 0 0';
+      b1.onclick=()=>{setRef(c.toDataURL('image/png'));switchTab('gen');msg('Loaded as the style reference. Tap Pixelate photo.')};card.appendChild(b1);$('isoGrid').appendChild(card)}
+    catch(e){msg(`Skipped ${f.name}: ${e.message}`)}}
+  $('isoSave').hidden=!isoOut.length;if(isoOut.length)msg(`${isoOut.length} photos isolated. Save them, or send one to Pixelate.`)};
+$('isoSave').onclick=async()=>{for(const r of isoOut)await saveFiles('References',r.name,[{ext:'png',blob:await toBlob(r.c)}]);msg(`Saved ${isoOut.length} photos to ${dest.faction} / ${dest.sub} / References.`)};
+$('bDs').onclick=async()=>{const {sel}=await picked(),png=sel.filter(r=>r.file.endsWith('.png'));if(!png.length)return msg('Tick some PNG files first.');
+  const t=$('dsTrigger').value.trim(),out=[],enc=new TextEncoder();
+  for(const [i,r] of png.entries()){const b=String(i+1).padStart(4,'0');
+    out.push({path:`dataset/${b}.png`,data:new Uint8Array(await r.blob.arrayBuffer())});
+    out.push({path:`dataset/${b}.txt`,data:enc.encode([t,r.name.replace(/_/g,' '),r.faction,r.sub,r.type,'pixel art game sprite'].filter(Boolean).join(', '))})}
+  dl(makeZip(out),slug(cur)+'_training_set.zip');msg(`Exported ${png.length} images with caption files.`)};
+ready=dbOpen().then(async d=>{db=d;await migrate();window.filesReady=true;drawDest();renderFiles()});
+/* progress: every long action shows a spinner and a bar under the status line, which stays pinned to the top */
+function wrapBusy(id,prop){const el=$(id),h=el[prop];if(!h)return;
+  el[prop]=async function(...a){prog.start();await tick();try{return await h.apply(this,a)}finally{prog.end()}}}
+['gen','isoGo','isoSave','bDs','d8Gif','teamRed','teamBlue','godotBtn','wpnAdd','pixBtn','bMove','bZip','bRen','mkStyle','mkPal','d8Gen','d8Save','aDirGen','aSheet4','aSheetSave','aAI','aBlk','aShoot','aMove','aAIoff','poseRedo','chatSend','chatApply','chatDirect','batchGo','dlAtlas','saveAtlas','fZip','fSave','aDl','aLib','splitLibAll','aUse','toLib'].forEach(id=>wrapBusy(id,'onclick'));
+['aFile','tileFile','fLoad','aN','splitGap'].forEach(id=>wrapBusy(id,'onchange'));
+
+(()=>{const t=new URLSearchParams(location.hash.slice(1)).get('tab');if(t&&TITLES[t])switchTab(t)})();
+</script>
+</body>
+</html>

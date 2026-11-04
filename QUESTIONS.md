@@ -101,3 +101,32 @@ Each item lists the decision I needed, the default I used, and how to change it.
 
 17. **Startup:** if a project was open last time, PackFlow opens it in step 1 at launch
     (project mode). "Close project" in step 1 goes back to pasting code.
+
+## Phase 6
+
+18. **Music on the free tier:** I couldn't open Google's docs from this session (ai.google.dev
+    was blocked), but search results consistently say the Lyria models
+    (`lyria-3-clip-preview`, `lyria-3.5`) have **no free tier** in the Gemini API (about
+    $0.04 per 30-second clip). So music generation likely needs billing on your key.
+    **Default used:** Lyria generation with `lyria-3-clip-preview`, an editable model ID, and a
+    clear note in the UI, plus the free "Import a track made in the Gemini app" path.
+
+19. **Model names (checked via search, Nov 2026):** images `gemini-nano-banana-2.1` /
+    `gemini-3-pro-image` (`gemini-3.1-flash-image` deprecated); TTS `gemini-3.8-flash-tts`
+    (and `-lite`); music `lyria-3-clip-preview` / `lyria-3.5`. All are editable in the app
+    because they change often. Please double-check them against
+    https://ai.google.dev/gemini-api/docs/models when you can.
+
+20. **Lyria request format:** I send the documented plain `generateContent` prompt and, if that
+    returns no audio, retry once asking for `responseModalities: ["AUDIO","TEXT"]`. I couldn't
+    test against the live API. Any error message is shown and logged.
+
+21. **Imperium suite storage:** the suite still keeps its own library (IndexedDB) and Project
+    Files tab; inside PackFlow every save is also written into the PackFlow project. I left
+    its internal library in place rather than rewriting it.
+    **Default used:** both.
+
+22. **Blue drift root cause (my reading of the code):** generated images come back with a
+    slight cool cast; the palette snap measured distance mostly by lightness, so warm and
+    neutral mid-tones snapped to the steel-blue/blue-gray entries; and the next generation
+    used that bluer sprite as its reference, so it compounded. See `tools/build_asset_suite.py`.
