@@ -62,7 +62,12 @@ class GitHubBuildController(private val scope: CoroutineScope) {
     }
 
     /** files: path -> bytes of the generated project. */
-    fun pushAndBuild(context: Context, appName: String, files: List<Pair<String, ByteArray>>) {
+    fun pushAndBuild(
+        context: Context,
+        appName: String,
+        files: List<Pair<String, ByteArray>>,
+        onApk: (File) -> Unit = {}
+    ) {
         if (_state.value.busy) return
         val settings = GitHubSettings(context)
         val target = settings.target
@@ -82,7 +87,7 @@ class GitHubBuildController(private val scope: CoroutineScope) {
                 }
                 ErrorLog.info("Pushed $appName to ${target.owner}/${target.repo}@${target.branch} (${sha.take(7)})")
                 _state.update { it.copy(commitSha = sha, progress = "Pushed ${sha.take(7)}. Waiting for GitHub Actions to start…") }
-                watch(appCtx, client, sha)
+                watch(appCtx, client, sha, onApk)
             } catch (t: kotlinx.coroutines.CancellationException) {
                 throw t
             } catch (t: Throwable) {
@@ -92,7 +97,7 @@ class GitHubBuildController(private val scope: CoroutineScope) {
         }
     }
 
-    private suspend fun watch(context: Context, client: GitHubBuildClient, sha: String) {
+    private suspend fun watch(context: Context, client: GitHubBuildClient, sha: String, onApk: (File) -> Unit) {
         var run: WorkflowRun? = null
         // The run usually appears within a few seconds of the push.
         for (attempt in 0 until 24) {
@@ -134,6 +139,7 @@ class GitHubBuildController(private val scope: CoroutineScope) {
         val dir = File(context.cacheDir, "github_builds").apply { mkdirs(); listFiles()?.forEach { f -> f.delete() } }
         val apk = withContext(Dispatchers.IO) { client.downloadApk(artifact, dir) }
         ErrorLog.info("Downloaded ${apk.name} (${apk.length()} bytes) from run ${run!!.id}")
+        onApk(apk)
         _state.update { it.copy(busy = false, apkFile = apk, progress = "APK ready: ${apk.name}") }
     }
 }

@@ -9,7 +9,7 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
 | 2 Error catcher | ✅ | JS + Android catcher injected into every generated APK; standalone copy in reusable/error-catcher |
 | 3 Icon maker | ✅ | Crop/zoom/background, 5 shape previews, all densities + adaptive icon |
 | 4 Offline quick build | ✅ | Shell module + on-device manifest rewrite + apksig signing; verified on CI with aapt2/apksigner |
-| 5 Home + Projects | ⏭ | |
+| 5 Home + Projects | ✅ | Home with 4 entries, project file browser, Send to PackFlow, builds saved per project |
 | 6 Asset Generator | ⏭ | |
 | 7 Game Designer | ⏭ | |
 | 8 Engine + templates | ⏭ | |
@@ -121,6 +121,35 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
   `aapt2 dump badging` and `apksigner verify` on the result.
 
 **Kotlin apps** still use the GitHub build (the quick build card only shows for HTML/JS/React).
+
+## Phase 5: Home screen + Projects
+
+**Done**
+- Launch screen with four big entries: **Asset Generator**, **Game Designer**, **PackFlow**,
+  **Projects** (two columns on wide screens/unfolded). Shows the current project.
+- **Projects** (built-in file browser, `filesDir/projects/<slug>/`): each game gets `code/`,
+  `sprites/`, `tiles/`, `levels/`, `sounds/`, `music/`, `voice/`, `icon/`, `builds/` and a
+  `project.json` (name, app name, package, version).
+  - New project (name + template), import a project zip (zip-slip safe, 500 MB cap),
+    rename, export zip, delete (with confirmation).
+  - Inside a project: browse folders, tap to preview images (crisp pixel scaling), play
+    audio, view/edit code and text files; per-file Rename / Move (folder picker) / Delete;
+    Import here (multi-select from phone storage); New folder; Export zip.
+  - **Send to PackFlow** loads the whole project into pipeline step 1.
+- **Project mode in PackFlow**: the Preview WebView serves the project's real files (code/
+  is the web root, `sprites/…`, `levels/…`, `sounds/…` keep their folder names) with the
+  error catcher injected into `index.html`. Diagnostics run on `code/`. The icon maker uses
+  the project's `icon/` folder and can pick images from the project. Quick build, GitHub
+  build and project ZIP all ship the project's web root. Every APK/ZIP built is also copied
+  into the project's `builds/`.
+- The current project is remembered and shared by all sections; PackFlow reloads it when
+  you enter it after switching projects.
+- Generated WebView apps (GitHub path) now serve assets from
+  `https://appassets.androidplatform.net/assets/` like the quick-build shell, so `fetch()`
+  of level/unit JSON works in both build paths.
+- Tests: `ProjectLayoutTest` (web mapping both ways, unsafe paths, names, meta, templates),
+  `ProjectRepositoryTest` (Robolectric, CI): folders, rename/move/delete, refusing paths
+  outside projects, zip export without builds/.
 
 **Build environment note:** the cloud session I worked in can't reach Google's Maven repo, so
 I couldn't run the Android build locally. Every phase was compiled and tested by the GitHub

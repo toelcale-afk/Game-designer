@@ -5,6 +5,12 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.aistudio.packflow.xkrv.installer.ErrorLog
+import com.example.core.ErrorCatcher
+import com.example.core.FileKind
+import com.example.core.ProjectLayout
+import com.example.data.ProjectRepository
+import com.example.model.ClaudeArtifactType
 import com.example.data.ClaudeApkConverter
 import com.example.data.GitHubBuildController
 import com.example.data.IconMakerController
@@ -59,7 +65,11 @@ data class PackFlowUiState(
     val isPackaging: Boolean = false,
     val statusBannerMessage: String? = null,
     val editingEntry: StagedEntry? = null,
-    val showNewFileDialog: Boolean = false
+    val showNewFileDialog: Boolean = false,
+    // Project mode (Phase 5)
+    val projectDir: String? = null,
+    val projectName: String? = null,
+    val projectRevision: Int = 0
 ) {
     val totalStagedBytes: Long
         get() = stagedEntries.sumOf { it.sizeBytes.toLong() }
@@ -85,6 +95,13 @@ class PackFlowViewModel : ViewModel() {
 
     /** Step 2 icon maker. */
     val iconMaker = IconMakerController(viewModelScope)
+
+    /** Application context, remembered from the first UI call (needed for project storage). */
+    private var appContext: Context? = null
+
+    fun attach(context: Context) {
+        appContext = context.applicationContext
+    }
 
     /** Step 3 offline quick build (HTML/JS apps). */
     val quickBuild = QuickBuildController(viewModelScope)
@@ -255,67 +272,185 @@ class PackFlowViewModel : ViewModel() {
         _uiState.update { it.copy(isLivePreviewFullScreen = fullScreen) }
     }
 
+    /** The project's web root when a project is loaded (project mode), else null. Blocking. */
+    private fun projectWebFiles(state: PackFlowUiState): Map<String, ByteArray>? =
+        state.projectDir?.let { dir -> appContext?.let { ProjectRepository(it).webFiles(File(dir)) } }
+
+    /** Blocking: may read the project from storage. */
     private fun projectEntries(state: PackFlowUiState): List<StagedEntry> =
         ClaudeApkConverter.generateApkProjectEntries(
             config = state.claudeConfig,
             claudeFiles = state.claudeExtractedFiles,
             iconPngs = iconMaker.projectPngs(),
-            iconXml = iconMaker.xmlFiles()
+            iconXml = iconMaker.xmlFiles(),
+            webAssets = projectWebFiles(state)
         )
 
-    /** The full generated Android project as (path, bytes), used by the GitHub build. */
-    fun generatedProjectFiles(): List<Pair<String, ByteArray>> {
-        val state = _uiState.value
-        return projectEntries(state).map { it.relativePath to it.bytes }
-    }
+    /** The full generated Android project as (path, bytes), used by the GitHub build. Blocking. */
+    fun generatedProjectFiles(): List<Pair<String, ByteArray>> =
+        projectEntries(_uiState.value).map { it.relativePath to it.bytes }
 
-    /** Web files for the quick build: the compiled single-page app (plus project assets later). */
+    /** Web files for the quick build: the project's web root, or the compiled single page. Blocking. */
     fun quickBuildWebFiles(): Map<String, ByteArray> {
         val state = _uiState.value
+        val project = projectWebFiles(state)
+        if (project != null) {
+            return project.mapValues { (path, bytes) ->
+                if (path == "index.html") ErrorCatcher.injectIntoHtml(String(bytes)).toByteArray() else bytes
+            }
+        }
         return mapOf("index.html" to ClaudeApkConverter.buildStandaloneWebApkHtml(state.claudeConfig, state.claudeExtractedFiles).toByteArray())
     }
 
     fun startQuickBuild(context: Context, packageName: String, versionName: String, versionCode: Int, fullscreen: Boolean, orientation: String) {
+        appContext = context.applicationContext
         val config = _uiState.value.claudeConfig
-        quickBuild.build(
-            context,
-            QuickBuildSpec(
-                appName = config.appName,
-                packageName = packageName.trim(),
-                versionName = versionName.trim().ifBlank { "1.0" },
-                versionCode = versionCode,
-                webFiles = quickBuildWebFiles(),
-                icons = QuickBuildController.legacyIcons(iconMaker.projectPngs()),
-                fullscreen = fullscreen,
-                orientation = orientation
-            )
-        )
+        viewModelScope.launch {
+            try {
+                val web = withContext(Dispatchers.IO) { quickBuildWebFiles() }
+                quickBuild.build(
+                    context,
+                    QuickBuildSpec(
+                        appName = config.appName,
+                        packageName = packageName.trim(),
+                        versionName = versionName.trim().ifBlank { "1.0" },
+                        versionCode = versionCode,
+                        webFiles = web,
+                        icons = QuickBuildController.legacyIcons(iconMaker.projectPngs()),
+                        fullscreen = fullscreen,
+                        orientation = orientation
+                    ),
+                    onBuilt = { apk -> saveBuildToProject(apk) }
+                )
+            } catch (e: Throwable) {
+                recordException(e, "Quick build")
+            }
+        }
     }
 
     fun pushAndBuildOnGitHub(context: Context) {
-        gitHub.pushAndBuild(context, _uiState.value.claudeConfig.appName, generatedProjectFiles())
+        appContext = context.applicationContext
+        viewModelScope.launch {
+            try {
+                val files = withContext(Dispatchers.IO) { generatedProjectFiles() }
+                gitHub.pushAndBuild(context, _uiState.value.claudeConfig.appName, files, onApk = { apk -> saveBuildToProject(apk) })
+            } catch (e: Throwable) {
+                recordException(e, "Prepare GitHub build")
+            }
+        }
+    }
+
+    /** Keeps a copy of every APK/ZIP built for a project in its builds/ folder. */
+    private fun saveBuildToProject(file: File) {
+        val dir = _uiState.value.projectDir ?: return
+        val ctx = appContext ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { ProjectRepository(ctx).saveReplacing(File(dir, ProjectLayout.BUILDS), file.name, file.readBytes()) }
+                .onFailure { ErrorLog.error("Couldn't copy ${file.name} into the project", it) }
+        }
     }
 
     fun packageClaudeFilesIntoApkZip(context: Context) {
-        try {
-            val state = _uiState.value
-            val entries = projectEntries(state)
-            val slug = state.claudeConfig.appName.lowercase(Locale.US)
-                .replace(Regex("[^a-z0-9]+"), "_")
-                .trim('_')
-                .ifBlank { "claude_apk_project" }
+        appContext = context.applicationContext
+        viewModelScope.launch {
+            try {
+                val state = _uiState.value
+                val entries = withContext(Dispatchers.IO) { projectEntries(state) }
+                val slug = state.claudeConfig.appName.lowercase(Locale.US)
+                    .replace(Regex("[^a-z0-9]+"), "_")
+                    .trim('_')
+                    .ifBlank { "claude_apk_project" }
 
-            _uiState.update {
-                it.copy(
-                    bundleName = "${slug}_apk_project",
-                    stagedEntries = entries,
-                    activeTab = PackFlowTab.BUNDLER
-                )
+                _uiState.update {
+                    it.copy(
+                        bundleName = "${slug}_apk_project",
+                        stagedEntries = entries,
+                        activeTab = PackFlowTab.BUNDLER
+                    )
+                }
+                packageCurrentStagingToZip(context)
+            } catch (e: Throwable) {
+                recordException(e, "Package Claude Files to APK Project")
             }
-            packageCurrentStagingToZip(context)
-        } catch (e: Throwable) {
-            recordException(e, "Package Claude Files to APK Project")
         }
+    }
+
+    // ========================================================================
+    // PROJECT MODE (Phase 5): a project from Projects is loaded into the pipeline
+    // ========================================================================
+
+    /** Loads a project into step 1. Its code/ files feed diagnostics; preview and builds use its files. */
+    fun loadProject(context: Context, dir: File) {
+        appContext = context.applicationContext
+        viewModelScope.launch {
+            try {
+                val repo = ProjectRepository(context)
+                val (meta, code) = withContext(Dispatchers.IO) {
+                    repo.currentProject = dir
+                    repo.readMeta(dir) to readCodeFiles(dir)
+                }
+                iconMaker.load(File(dir, ProjectLayout.ICON))
+                val config = _uiState.value.claudeConfig.copy(
+                    appName = meta.appName,
+                    applicationId = meta.packageName,
+                    versionName = meta.versionName,
+                    artifactType = ClaudeArtifactType.HTML_WEB_APP
+                )
+                _uiState.update {
+                    it.copy(
+                        projectDir = dir.absolutePath,
+                        projectName = meta.name,
+                        projectRevision = it.projectRevision + 1,
+                        claudeRawInput = "",
+                        claudeConfig = config,
+                        claudeExtractedFiles = code,
+                        claudeDiagnostics = ClaudeApkConverter.analyzeDiagnostics(config, code),
+                        claudeRuntimeErrors = emptyList(),
+                        claudeConsoleLogs = emptyList(),
+                        activeTab = PackFlowTab.PREVIEW,
+                        statusBannerMessage = "Loaded project ${meta.name} (${code.size} code file(s))"
+                    )
+                }
+            } catch (e: Throwable) {
+                recordException(e, "Load project into PackFlow")
+            }
+        }
+    }
+
+    /** Re-reads the loaded project's files (after editing them in Projects). */
+    fun reloadProject(context: Context) {
+        _uiState.value.projectDir?.let { loadProject(context, File(it)) }
+    }
+
+    /** Back to paste/preset mode. */
+    fun leaveProject(context: Context) {
+        _uiState.update { it.copy(projectDir = null, projectName = null) }
+        iconMaker.load(File(context.filesDir, "icon_maker"))
+        selectClaudePreset(ClaudeApkConverter.presets.first())
+    }
+
+    /** Text files under code/ as source files for diagnostics. */
+    private fun readCodeFiles(dir: File): List<ClaudeSourceFile> {
+        val code = File(dir, ProjectLayout.CODE)
+        return code.walkTopDown()
+            .filter { it.isFile && ProjectLayout.kindOf(it.name) == FileKind.TEXT && it.length() < 512 * 1024 }
+            .sortedBy { it.relativeTo(code).invariantSeparatorsPath }
+            .map { f ->
+                val rel = f.relativeTo(code).invariantSeparatorsPath
+                ClaudeSourceFile(UUID.randomUUID().toString(), rel, ClaudeApkConverter.inferLangFromFileName(rel), f.readText())
+            }
+            .toList()
+    }
+
+    /** Serves a preview request for the loaded project: web path -> (mime, bytes). */
+    fun serveProjectFile(webPath: String): Pair<String, ByteArray>? {
+        val dir = _uiState.value.projectDir ?: return null
+        val rel = ProjectLayout.projectPathForWeb(webPath) ?: return null
+        val f = File(dir, rel)
+        if (!f.isFile) return null
+        val bytes = f.readBytes()
+        val out = if (webPath == "index.html") ErrorCatcher.injectIntoHtml(String(bytes)).toByteArray() else bytes
+        return ProjectLayout.mimeType(f.name) to out
     }
 
     // ========================================================================

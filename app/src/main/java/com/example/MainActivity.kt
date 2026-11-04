@@ -73,6 +73,18 @@ import com.example.ui.PackFlowViewModel
 import com.example.ui.PreviewScreen
 import com.example.ui.QuickBuildCard
 import com.example.ui.theme.MyApplicationTheme
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.example.core.FileKind
+import com.example.core.ProjectLayout
+import com.example.data.ProjectRepository
+import com.example.ui.HomeScreen
+import com.example.ui.PreviewProject
+import com.example.ui.ProjectsScreen
+import com.example.ui.StudioSection
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,9 +93,73 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                PackFlowApp()
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    StudioApp()
+                }
             }
         }
+    }
+}
+
+/**
+ * Top level: Home with Asset Generator, Game Designer, PackFlow and Projects.
+ * The current project is shared by every section.
+ */
+@Composable
+fun StudioApp(viewModel: PackFlowViewModel = viewModel()) {
+    val context = LocalContext.current
+    val repo = remember { ProjectRepository(context) }
+    var section by rememberSaveable { mutableStateOf(StudioSection.HOME) }
+    var currentProject by remember { mutableStateOf(repo.currentProject) }
+    val setCurrent: (File?) -> Unit = { dir ->
+        repo.currentProject = dir
+        currentProject = dir
+    }
+    LaunchedEffect(Unit) {
+        viewModel.attach(context)
+        // Open the last project in PackFlow too, so every section works on the same game.
+        repo.currentProject?.let { viewModel.loadProject(context, it) }
+    }
+    LaunchedEffect(section) {
+        val cur = currentProject
+        if (section == StudioSection.PACKFLOW && cur != null && viewModel.uiState.value.projectDir != cur.absolutePath) {
+            viewModel.loadProject(context, cur)
+        }
+    }
+    val goHome = { section = StudioSection.HOME }
+    BackHandler(enabled = section == StudioSection.ASSETS || section == StudioSection.DESIGNER) { goHome() }
+
+    when (section) {
+        StudioSection.HOME -> HomeScreen(
+            currentProjectName = currentProject?.let { repo.readMeta(it).name },
+            onOpen = { section = it }
+        )
+        StudioSection.PACKFLOW -> PackFlowApp(
+            viewModel = viewModel,
+            onExit = goHome,
+            onOpenProjects = { section = StudioSection.PROJECTS }
+        )
+        StudioSection.PROJECTS -> ProjectsScreen(
+            currentProject = currentProject,
+            onCurrentProjectChange = setCurrent,
+            onSendToPackFlow = { dir ->
+                setCurrent(dir)
+                viewModel.loadProject(context, dir)
+                section = StudioSection.PACKFLOW
+            },
+            onBack = goHome
+        )
+        StudioSection.ASSETS -> SectionPlaceholder("Asset Generator", goHome)
+        StudioSection.DESIGNER -> SectionPlaceholder("Game Designer", goHome)
+    }
+}
+
+@Composable
+private fun SectionPlaceholder(title: String, onBack: () -> Unit) {
+    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text(title, style = MaterialTheme.typography.headlineSmall)
+        Text("Coming in the next phase.")
+        Button(onClick = onBack) { Text("Home") }
     }
 }
 
@@ -95,7 +171,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun PackFlowApp(
     viewModel: PackFlowViewModel = viewModel(),
-    onExit: (() -> Unit)? = null
+    onExit: (() -> Unit)? = null,
+    onOpenProjects: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -105,7 +182,7 @@ fun PackFlowApp(
     LaunchedEffect(Unit) {
         viewModel.refreshRuntimeTelemetry(context)
         viewModel.gitHub.load(context)
-        viewModel.iconMaker.load(java.io.File(context.filesDir, "icon_maker"))
+        if (uiState.projectDir == null) viewModel.iconMaker.load(File(context.filesDir, "icon_maker"))
     }
 
     BackHandler(
@@ -160,6 +237,17 @@ fun PackFlowApp(
             viewModel.exportArchiveToUri(context, archive, destinationUri)
         }
         pendingExportArchive = null
+    }
+
+    // Images in the loaded project, for "icon from project".
+    val projectImages by produceState(emptyList<File>(), uiState.projectDir, uiState.projectRevision) {
+        value = withContext(Dispatchers.IO) {
+            uiState.projectDir?.let { dir ->
+                File(dir).walkTopDown()
+                    .filter { it.isFile && ProjectLayout.kindOf(it.name) == FileKind.IMAGE && !it.path.contains("/icon/generated/") }
+                    .take(200).toList()
+            } ?: emptyList()
+        }
     }
 
     val goTo: (PackFlowTab) -> Unit = { tab ->
@@ -240,12 +328,23 @@ fun PackFlowApp(
                         onNext = { goTo(PackFlowTab.ICON) },
                         onAppendConsoleLog = viewModel::appendWebViewConsoleMessage,
                         onClearConsole = viewModel::clearConsoleLogs,
-                        onToggleFullScreenPreview = viewModel::toggleLivePreviewFullScreen
+                        onToggleFullScreenPreview = viewModel::toggleLivePreviewFullScreen,
+                        project = uiState.projectDir?.let {
+                            PreviewProject(
+                                name = uiState.projectName ?: "Project",
+                                revision = uiState.projectRevision,
+                                serve = viewModel::serveProjectFile,
+                                onReload = { viewModel.reloadProject(context) },
+                                onOpenInProjects = onOpenProjects,
+                                onLeave = { viewModel.leaveProject(context) }
+                            )
+                        }
                     )
 
                     PackFlowTab.ICON -> IconStepScreen(
                         viewModel = viewModel,
-                        onNext = { goTo(PackFlowTab.COMPILE) }
+                        onNext = { goTo(PackFlowTab.COMPILE) },
+                        projectImages = projectImages
                     )
 
                     PackFlowTab.COMPILE -> CompileCheckScreen(

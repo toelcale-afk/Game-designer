@@ -177,4 +177,143 @@ jobs:
 </manifest>
 """
     }
+
+    /** Escapes text for use inside a Kotlin string literal in generated code. */
+    fun kotlinString(s: String): String =
+        s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("$", "\\$")
+
+    /**
+     * MainActivity for generated WebView apps. Serves app/src/main/assets/ from
+     * https://appassets.androidplatform.net/assets/ (so fetch() and modules work), exposes the
+     * error-catcher bridge, and optionally the AndroidApkBridge helper.
+     */
+    fun webHostActivity(packageName: String, appName: String, enableJsBridge: Boolean, fullscreen: Boolean): String =
+        WEB_HOST_TEMPLATE
+            .replace("__PACKAGE__", packageName)
+            .replace("__APP_NAME__", kotlinString(appName))
+            .replace("__JS_BRIDGE__", enableJsBridge.toString())
+            .replace("__FULLSCREEN__", fullscreen.toString())
+
+    private const val WEB_HOST_TEMPLATE = """package __PACKAGE__
+
+import android.annotation.SuppressLint
+import android.os.Build
+import android.os.Bundle
+import android.view.View
+import android.view.WindowInsets
+import android.view.WindowInsetsController
+import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
+import java.io.IOException
+
+class MainActivity : ComponentActivity() {
+
+    private lateinit var webView: WebView
+
+    @SuppressLint("SetJavaScriptEnabled")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        webView = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.mediaPlaybackRequiresUserGesture = false
+            webChromeClient = WebChromeClient()
+            webViewClient = object : WebViewClient() {
+                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
+                    serveAsset(request.url.host, request.url.path)
+            }
+            // PackFlow error catcher: web errors go to the same log as crashes.
+            addJavascriptInterface(PackFlowErrorBridge(this@MainActivity), "PackFlowAndroid")
+            if (__JS_BRIDGE__) {
+                addJavascriptInterface(ClaudeAndroidBridge(), "AndroidApkBridge")
+            }
+        }
+        setContentView(webView)
+        if (savedInstanceState != null) webView.restoreState(savedInstanceState)
+        else webView.loadUrl("https://" + HOST + "/assets/index.html")
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView.canGoBack()) {
+                    webView.goBack()
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
+            }
+        })
+    }
+
+    private fun serveAsset(host: String?, path: String?): WebResourceResponse? {
+        if (host != HOST || path == null || !path.startsWith("/assets/")) return null
+        val assetPath = path.removePrefix("/assets/")
+        if (assetPath.contains("..")) return null
+        val ext = assetPath.substringAfterLast('.', "").lowercase()
+        val mime = MIME[ext] ?: "application/octet-stream"
+        return try {
+            WebResourceResponse(mime, if (mime.startsWith("text/") || ext == "json") "UTF-8" else null, assets.open(assetPath))
+        } catch (e: IOException) {
+            WebResourceResponse("text/plain", "UTF-8", null).apply { setStatusCodeAndReasonPhrase(404, "Not Found") }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        webView.saveState(outState)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && __FULLSCREEN__) hideSystemBars()
+    }
+
+    @Suppress("DEPRECATION")
+    private fun hideSystemBars() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            window.setDecorFitsSystemWindows(false)
+            window.insetsController?.let {
+                it.hide(WindowInsets.Type.systemBars())
+                it.systemBarsBehavior = WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        } else {
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
+                View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+        }
+    }
+
+    inner class ClaudeAndroidBridge {
+        @JavascriptInterface
+        fun showToast(message: String) {
+            runOnUiThread {
+                Toast.makeText(this@MainActivity, message, Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        @JavascriptInterface
+        fun getAppName(): String = "__APP_NAME__"
+
+        @JavascriptInterface
+        fun getPackageName(): String = packageName
+    }
+
+    companion object {
+        private const val HOST = "appassets.androidplatform.net"
+        private val MIME = mapOf(
+            "html" to "text/html", "htm" to "text/html", "js" to "text/javascript", "mjs" to "text/javascript",
+            "css" to "text/css", "json" to "application/json", "png" to "image/png", "jpg" to "image/jpeg",
+            "jpeg" to "image/jpeg", "gif" to "image/gif", "webp" to "image/webp", "svg" to "image/svg+xml",
+            "wav" to "audio/wav", "mp3" to "audio/mpeg", "ogg" to "audio/ogg", "m4a" to "audio/mp4",
+            "txt" to "text/plain", "woff2" to "font/woff2", "ttf" to "font/ttf", "wasm" to "application/wasm"
+        )
+    }
+}
+"""
 }

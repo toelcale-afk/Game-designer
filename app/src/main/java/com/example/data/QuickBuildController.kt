@@ -38,7 +38,7 @@ class QuickBuildController(private val scope: CoroutineScope) {
         }
     }
 
-    fun build(context: Context, spec: QuickBuildSpec) {
+    fun build(context: Context, spec: QuickBuildSpec, onBuilt: (File) -> Unit = {}) {
         if (_state.value.busy) return
         spec.validationError()?.let { msg -> _state.update { it.copy(error = msg) }; return }
         val app = context.applicationContext
@@ -48,6 +48,7 @@ class QuickBuildController(private val scope: CoroutineScope) {
                 val apk = withContext(Dispatchers.IO) {
                     QuickBuilder.build(app, spec) { p -> _state.update { s -> s.copy(progress = p) } }
                 }
+                onBuilt(apk)
                 _state.update {
                     it.copy(
                         busy = false, apk = apk, progress = "Built ${apk.name} (${apk.length() / 1024} KB)",

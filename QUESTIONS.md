@@ -87,3 +87,17 @@ Each item lists the decision I needed, the default I used, and how to change it.
 
 14. **React (JSX) artifacts** still load React/Babel from unpkg.com, so they need internet at
     run time even when built offline. Plain HTML/JS games run fully offline.
+
+## Phase 5
+
+15. **Where projects live:** in PackFlow's private storage (`filesDir/projects/`), not shared
+    storage. Android 11+ hides other apps' folders, and private storage needs no permissions.
+    Moving files in and out is done with Import (phone storage picker) and Export zip.
+    **Default used:** private storage + import/export.
+
+16. **Web root layout:** `code/` is the web root of the built game, and asset folders keep
+    their names next to it (`sprites/x.png`, `levels/l1.json`). Designer JSON goes in
+    `code/data/`. **Default used:** this layout (documented in `core/ProjectLayout.kt`).
+
+17. **Startup:** if a project was open last time, PackFlow opens it in step 1 at launch
+    (project mode). "Close project" in step 1 goes back to pasting code.

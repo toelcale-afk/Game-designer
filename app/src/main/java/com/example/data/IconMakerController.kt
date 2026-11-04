@@ -57,7 +57,8 @@ class IconMakerController(private val scope: CoroutineScope) {
                 val pngs = readGenerated(dir)
                 IconMakerUi(design = design, source = src, backgroundImage = bg, pngs = pngs)
             }
-            _state.value = loaded
+            // A newer load (another project) may have started meanwhile.
+            if (iconDir == dir) _state.value = loaded
         }
     }
 

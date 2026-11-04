@@ -9,6 +9,9 @@ import android.webkit.JavascriptInterface
 import com.aistudio.packflow.xkrv.installer.ErrorLog
 import com.example.core.ErrorCatcher
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
+import java.io.ByteArrayInputStream
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -95,13 +98,16 @@ fun PreviewScreen(
     onAppendConsoleLog: (String, String, Int) -> Unit,
     onClearConsole: () -> Unit,
     onToggleFullScreenPreview: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    project: PreviewProject? = null
 ) {
     var reloadNonce by remember { mutableIntStateOf(0) }
 
-    val previewHtml = remember(config, extractedFiles, reloadNonce) {
-        ClaudeApkConverter.buildStandaloneWebApkHtml(config, extractedFiles)
+    // Project mode serves the project's own files; otherwise everything is compiled into one page.
+    val previewHtml = remember(config, extractedFiles, reloadNonce, project?.revision) {
+        if (project != null) "" else ClaudeApkConverter.buildStandaloneWebApkHtml(config, extractedFiles)
     }
+    val serve = project?.serve
 
     if (isFullScreenPreview) {
         Column(
@@ -130,11 +136,12 @@ fun PreviewScreen(
                 }
             }
             Box(modifier = Modifier.weight(1f)) {
-                key(reloadNonce, previewHtml) {
+                key(reloadNonce, previewHtml, project?.revision) {
                     EmbeddedClaudeWebView(
                         htmlContent = previewHtml,
                         onConsoleMessage = onAppendConsoleLog,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        serve = serve
                     )
                 }
             }
@@ -197,12 +204,19 @@ fun PreviewScreen(
                 config = config,
                 previewHtml = previewHtml,
                 reloadNonce = reloadNonce,
+                serve = serve,
+                projectRevision = project?.revision ?: 0,
                 consoleLogs = consoleLogs,
                 onReload = { reloadNonce++ },
                 onExpandFullScreen = { onToggleFullScreenPreview(true) },
                 onAppendConsoleLog = onAppendConsoleLog,
                 onClearConsole = onClearConsole
             )
+        }
+
+        if (project != null) {
+            item { ProjectModeCard(project = project, fileCount = extractedFiles.size, onNext = onNext) }
+            return@LazyColumn
         }
 
         // Code input card
@@ -302,6 +316,8 @@ private fun LiveEmulatorPreviewCard(
     config: ClaudeApkConfig,
     previewHtml: String,
     reloadNonce: Int,
+    serve: ((String) -> Pair<String, ByteArray>?)?,
+    projectRevision: Int,
     consoleLogs: List<ConsoleLogMessage>,
     onReload: () -> Unit,
     onExpandFullScreen: () -> Unit,
@@ -411,11 +427,12 @@ private fun LiveEmulatorPreviewCard(
 
                     // Interactive WebView Runtime
                     Box(modifier = Modifier.weight(1f)) {
-                        key(reloadNonce, previewHtml) {
+                        key(reloadNonce, previewHtml, projectRevision) {
                             EmbeddedClaudeWebView(
                                 htmlContent = previewHtml,
                                 onConsoleMessage = onAppendConsoleLog,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                serve = serve
                             )
                         }
                     }
@@ -618,7 +635,8 @@ internal fun ClaudeDiagnosticsCard(
 private fun EmbeddedClaudeWebView(
     htmlContent: String,
     onConsoleMessage: (level: String, message: String, lineNumber: Int) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    serve: ((String) -> Pair<String, ByteArray>?)? = null
 ) {
     AndroidView(
         modifier = modifier.testTag("embedded_claude_webview"),
@@ -626,8 +644,21 @@ private fun EmbeddedClaudeWebView(
             WebView(ctx).apply {
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
+                settings.mediaPlaybackRequiresUserGesture = false
                 addJavascriptInterface(PreviewErrorBridge(ctx.applicationContext), ErrorCatcher.BRIDGE_NAME)
-                webViewClient = WebViewClient()
+                webViewClient = object : WebViewClient() {
+                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                        val s = serve ?: return null
+                        val url = request.url
+                        if (url.host != PREVIEW_HOST) return null
+                        val path = url.path?.trimStart('/')?.ifBlank { "index.html" } ?: return null
+                        val found = runCatching { s(path) }.getOrNull()
+                            ?: return WebResourceResponse("text/plain", "UTF-8", 404, "Not Found", emptyMap(), null)
+                        val (mime, bytes) = found
+                        val charset = if (mime.startsWith("text/") || mime == "application/json") "UTF-8" else null
+                        return WebResourceResponse(mime, charset, ByteArrayInputStream(bytes))
+                    }
+                }
                 webChromeClient = object : WebChromeClient() {
                     override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
                         if (consoleMessage != null) {
@@ -640,25 +671,62 @@ private fun EmbeddedClaudeWebView(
                         return true
                     }
                 }
-                loadDataWithBaseURL(
-                    "https://appassets.androidplatform.net/",
-                    htmlContent,
-                    "text/html",
-                    "UTF-8",
-                    null
-                )
+                load(this, htmlContent, serve != null)
             }
         },
-        update = { webView ->
-            webView.loadDataWithBaseURL(
-                "https://appassets.androidplatform.net/",
-                htmlContent,
-                "text/html",
-                "UTF-8",
-                null
-            )
-        }
+        update = { webView -> load(webView, htmlContent, serve != null) }
     )
+}
+
+private const val PREVIEW_HOST = "appassets.androidplatform.net"
+
+private fun load(webView: WebView, html: String, projectMode: Boolean) {
+    if (projectMode) {
+        if (webView.url == null) webView.loadUrl("https://$PREVIEW_HOST/index.html")
+    } else {
+        webView.loadDataWithBaseURL("https://$PREVIEW_HOST/", html, "text/html", "UTF-8", null)
+    }
+}
+
+/** What the Preview step needs from a loaded project. */
+data class PreviewProject(
+    val name: String,
+    val revision: Int,
+    val serve: (String) -> Pair<String, ByteArray>?,
+    val onReload: () -> Unit,
+    val onOpenInProjects: () -> Unit,
+    val onLeave: () -> Unit
+)
+
+@Composable
+private fun ProjectModeCard(project: PreviewProject, fileCount: Int, onNext: () -> Unit) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("project_mode_card"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Project: ${project.name}", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "$fileCount code file(s) from code/. Sprites, levels, sounds and music are served from their project folders, exactly as in the built app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = project.onReload) { Text("Reload files") }
+                OutlinedButton(onClick = project.onOpenInProjects) { Text("Edit in Projects") }
+            }
+            OutlinedButton(onClick = project.onLeave) { Text("Close project (paste code instead)") }
+            Button(
+                onClick = onNext,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp)
+                    .testTag("preview_next_button")
+            ) { Text("Next: 2 Icon") }
+        }
+    }
 }
 
 /** window.PackFlowAndroid inside PackFlow's own preview: web errors go to PackFlow's Error Log. */
