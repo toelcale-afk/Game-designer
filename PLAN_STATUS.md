@@ -252,30 +252,23 @@ Tabs: **Sprites, Tiles, Levels, Sound, Music, Voice**. Everything saves into the
   the design validates against its own files, every file the game loads is shipped,
   levels sane.
 
-## How this was verified (and what wasn't)
+## How this was verified
 
-This session couldn't reach Google's Maven repository (so no Android Gradle build ran here)
-and **couldn't push to GitHub** (the Claude GitHub App has read-only access, so CI never
-ran; see QUESTIONS.md #8). Instead:
-
-- **Unit tests:** all pure-logic tests in `app/src/test/java/com/example/core/` (76 incl.
-  harness checks) pass on the JVM.
-- **Type-checking the whole app:** every Kotlin file, Compose UI included, compiles against
-  JetBrains' Compose desktop jars (same `androidx.compose.*` API) plus Robolectric's
-  `android-all` (API 36) and small stubs for Android-only APIs (activity, lifecycle, apksig).
-  The generated apps' `MainActivity.kt` and crash catcher compile too, and the shell's Java
-  compiles against API 36.
-- **JavaScript in Chromium:** the error catcher, the patched asset suite (incl. the color
-  fix) and a full play-through of the tactics template.
-- **Not run yet:** the real Android build, Robolectric tests (`IconRendererTest`,
-  `ProjectRepositoryTest`, `QuickBuildShellTest`), the aapt2/apksigner check of a quick-built
-  APK, and anything on a device. These run on the first CI build after you push.
+- **CI is green** (`build-packflow.yml` run #2): the shell builds, all unit tests pass
+  (including Robolectric `IconRendererTest`, `ProjectRepositoryTest`, and
+  `QuickBuildShellTest`, which patches the real shell, signs it and verifies the signature
+  with apksig), `aapt2 dump badging` and `apksigner verify` accept a quick-built APK, and the
+  debug APK is uploaded as `packflow-studio-debug-apk` (kept 3 days).
+- Run #1 also created and committed `keystore/debug.keystore`.
+- CI runs on JDK 21: Robolectric's Android 16 (API 36) sandbox needs it.
+- Earlier, in the session (no Google Maven there): JVM unit tests, a full type-check of the app
+  against Compose desktop + `android-all`, and the engine/error catcher/asset suite in
+  headless Chromium.
+- **Not tested yet:** anything on a real phone.
 
 ## Next
 
-1. Push the branch (or apply the git bundle) and let `build-packflow.yml` run. Fix anything
-   it reports. The most likely issues are version resolution (`apksig` 8.7.3, compileSdk
-   36.1 on the runner) rather than code.
+1. Install the debug APK from the latest run's artifacts on your phone.
 2. On a phone: create a "Grid tactics" project → Send to PackFlow → Preview → Icon →
    Quick build → Install. Then try the GitHub build with a token.
 3. Check the Gemini model IDs (QUESTIONS.md #19) and try Music/Voice with your key.

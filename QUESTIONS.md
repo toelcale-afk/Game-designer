@@ -49,7 +49,7 @@ Each item lists the decision I needed, the default I used, and how to change it.
    **Default used:** keep them separate so generated builds don't break when AI Studio
    updates PackFlow.
 
-8. **I couldn't push to GitHub from this session** (403 for both git push and the API: the
+8. **(Resolved: you granted write access and the branch is pushed.)** Originally: **I couldn't push to GitHub from this session** (403 for both git push and the API: the
    Claude GitHub App has read-only access). All work is committed locally on
    `claude/packflow-studio-android-5318tj`. I attached a git bundle of the branch so nothing is
    lost; see the final message. To give write access, install the Claude GitHub App with
@@ -130,3 +130,8 @@ Each item lists the decision I needed, the default I used, and how to change it.
     slight cool cast; the palette snap measured distance mostly by lightness, so warm and
     neutral mid-tones snapped to the steel-blue/blue-gray entries; and the next generation
     used that bluer sprite as its reference, so it compounded. See `tools/build_asset_suite.py`.
+
+## After the first CI runs
+
+23. **CI uses JDK 21** instead of 17: Robolectric (the template's own `ExampleRobolectricTest`
+    too) can't run its API 36 sandbox on Java 17. Generated game projects still build on 17.
