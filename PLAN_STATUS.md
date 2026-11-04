@@ -252,6 +252,33 @@ Tabs: **Sprites, Tiles, Levels, Sound, Music, Voice**. Everything saves into the
   the design validates against its own files, every file the game loads is shipped,
   levels sane.
 
-**Build environment note:** the cloud session I worked in can't reach Google's Maven repo, so
-I couldn't run the Android build locally. Every phase was compiled and tested by the GitHub
-Actions workflow, and pure-logic code was also unit-tested locally on the JVM.
+## How this was verified (and what wasn't)
+
+This session couldn't reach Google's Maven repository (so no Android Gradle build ran here)
+and **couldn't push to GitHub** (the Claude GitHub App has read-only access, so CI never
+ran; see QUESTIONS.md #8). Instead:
+
+- **Unit tests:** all pure-logic tests in `app/src/test/java/com/example/core/` (76 incl.
+  harness checks) pass on the JVM.
+- **Type-checking the whole app:** every Kotlin file, Compose UI included, compiles against
+  JetBrains' Compose desktop jars (same `androidx.compose.*` API) plus Robolectric's
+  `android-all` (API 36) and small stubs for Android-only APIs (activity, lifecycle, apksig).
+  The generated apps' `MainActivity.kt` and crash catcher compile too, and the shell's Java
+  compiles against API 36.
+- **JavaScript in Chromium:** the error catcher, the patched asset suite (incl. the color
+  fix) and a full play-through of the tactics template.
+- **Not run yet:** the real Android build, Robolectric tests (`IconRendererTest`,
+  `ProjectRepositoryTest`, `QuickBuildShellTest`), the aapt2/apksigner check of a quick-built
+  APK, and anything on a device. These run on the first CI build after you push.
+
+## Next
+
+1. Push the branch (or apply the git bundle) and let `build-packflow.yml` run. Fix anything
+   it reports. The most likely issues are version resolution (`apksig` 8.7.3, compileSdk
+   36.1 on the runner) rather than code.
+2. On a phone: create a "Grid tactics" project → Send to PackFlow → Preview → Icon →
+   Quick build → Install. Then try the GitHub build with a token.
+3. Check the Gemini model IDs (QUESTIONS.md #19) and try Music/Voice with your key.
+4. Ideas not done: real-time mode, Game Designer UI for picking a mission's mode, export/
+   backup of the quick-build signing key, sprite animation playback in the engine
+   (the Imperium suite already exports animation sheets + JSON).
