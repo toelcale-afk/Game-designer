@@ -13,7 +13,7 @@ Legend: ✅ done · 🟡 partly done · ⏭ next / not started
 | 6 Asset Generator | ✅ | Imperium suite as Sprites/Tiles (blue drift fixed), Levels, sfxr Sound, Lyria Music, Gemini + Android Voice |
 | 7 Game Designer | ✅ | Units, campaign/missions, menus/HUD, sound hookups, saves; JSON in code/data/ |
 | 8 Engine + templates | ✅ | HTML5 canvas engine + grid-tactics template (2 missions), real-time hook |
-| + Sound library & voice changer | ✅ | 464 built-in sounds; record or pick a clip, 17 voice presets |
+| + Sound library & voice changer | ✅ | 464 built-in sounds; online voice library (Freesound); record or pick a clip, 17 voice presets |
 
 ## Phase 0: Baseline
 
@@ -255,7 +255,19 @@ Tabs: **Sprites, Tiles, Levels, Sound, Music, Voice**. Everything saves into the
 
 ## Extra: sound library + voice changer (after the 8 phases)
 
-Asset Generator now has 8 tabs: Sprites, Tiles, Levels, Sound, **Library**, Music, Voice, **Voice FX**.
+Asset Generator now has 9 tabs: Sprites, Tiles, Levels, Sound, **SFX library**, Music, Voice,
+**Voice library**, **Voice FX**.
+
+- **Voice library (online)**: searches **Freesound** (freesound.org, free online sound
+  database with thousands of voice clips) with the user's own free API key (encrypted with the
+  Android Keystore). 12 ready-made voice searches (battle cries, grunts & pain, death screams,
+  commands, yes/no/ok, laughs, monster, robot, announcer, crowd, whispers, breathing) plus free
+  search, license filter (**CC0 only by default**; CC BY and CC BY-NC are opt-in, with a
+  warning for non-commercial), max length, stream previews, "Load more". **Add** downloads the
+  MP3 preview to `voice/freesound/` and records the author/license in `voice/CREDITS.md`;
+  **Add + change voice** opens it in Voice FX. `core/FreesoundApi.kt` + `FreesoundApiTest`
+  (parsing, license mapping, search URL without the key, credits written once).
+  Not tested against the live API from this session (freesound.org was unreachable here).
 
 - **Library**: a built-in database of 464 retro sounds in 8 categories (Weapons, Explosions,
   Impacts, UI, Pickups, Movement, Creatures, Sci-fi). They're sfxr recipes with fixed seeds

@@ -44,6 +44,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -171,7 +172,7 @@ fun SoundLibraryScreen(project: File, onEdit: (SfxParams, String) -> Unit) {
 
 /** Record (or pick) a voice line and change it: presets plus sliders, saved as WAV in voice/. */
 @Composable
-fun VoiceFxScreen(project: File) {
+fun VoiceFxScreen(project: File, incoming: File? = null) {
     val context = LocalContext.current
     val repo = remember { ProjectRepository(context) }
     val scope = rememberCoroutineScope()
@@ -219,6 +220,8 @@ fun VoiceFxScreen(project: File) {
             level = 0f
         }
     }
+
+    LaunchedEffect(incoming) { incoming?.let { load(it) } }
 
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) startRecording() else message = "Microphone permission is needed to record. You can still change existing clips."

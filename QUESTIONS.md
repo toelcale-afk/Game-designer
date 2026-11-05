@@ -135,3 +135,11 @@ Each item lists the decision I needed, the default I used, and how to change it.
 
 23. **CI uses JDK 21** instead of 17: Robolectric (the template's own `ExampleRobolectricTest`
     too) can't run its API 36 sandbox on Java 17. Generated game projects still build on 17.
+
+24. **Online voice database = Freesound.** It's the largest free sound database with a public
+    API and clear per-sound licenses. It needs a free account + API key (the key is stored
+    encrypted on the phone). PackFlow downloads the MP3 *previews* (good quality, no OAuth);
+    original full-quality files would need a Freesound OAuth login. **Default:** previews,
+    CC0-only results unless you tick other licenses; credits kept in `voice/CREDITS.md`.
+    Other "voice databases" (Mozilla Common Voice, LibriVox) are read-aloud speech for AI
+    training/audiobooks, not game voice lines, so I didn't use them.
